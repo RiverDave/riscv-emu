@@ -187,7 +187,7 @@ void print_registers(const risc_v_state *state) {
 
 bool is_riscv_state_valid(const risc_v_state *state) {
   // may add more stuff in here
-  return state->is_valid && state->is_running && state->pc < MEMORY_SIZE;
+  return state->is_valid && state->is_running && state->pc < MEMORY_SIZE && state->memory[state->pc] != 0x00;
 }
 
 void execute_instruction(risc_v_state *state, const Instruction *insn) {
@@ -197,10 +197,8 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     uint8_t rd  = insn->ops[0];
     uint8_t rs1 = insn->ops[1];
     uint8_t rs2 = insn->ops[2];
-    // x0 is hardwired to zero in RISC-V, keep it zero
     if (rd != REG_x0)
       state->regs[rd] = state->regs[rs1] + state->regs[rs2];
-
     state->pc+=4;
     break;
   }
@@ -210,6 +208,7 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     uint8_t rs2 = insn->ops[2];
     if (rd != REG_x0)
       state->regs[rd] = state->regs[rs1] - state->regs[rs2];
+    state->pc+=4;
     break;
   }
   default:
@@ -237,22 +236,146 @@ bool emulate(risc_v_state *state) {
 }
 
 //temporary function for testing
-void load_test_add_program(risc_v_state *state) {
+void load_test_add_program(risc_v_state *state, const uint8_t mem_offset) {
   if (!state) return;
   // Encoding for: add x3, x1, x2  -> 0x002081B3
-  const uint32_t add_x3_x1_x2 = 0x002081B3u;
-  state->memory[0] = add_x3_x1_x2; // word at index 0
+  const uint32_t add_x3_x1_x2 = 0x002081B3u; // 0000(0) 0000(0)  0010(2) 0000(0) 1000(8) 0001(1) 1011(B) 0011(3)
+  // 0000000 -> 0x20 -> funct7 = ADD
+  
+  state->memory[0 + mem_offset] = add_x3_x1_x2; // word at index 0
   state->regs[REG_x1] = 5;
   state->regs[REG_x2] = 7;
+  state->pc = 0 + mem_offset;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test_sub_program(risc_v_state *state, const uint8_t* passed_mem_offset) {
+  uint8_t offset = 0; if(passed_mem_offset) offset = *passed_mem_offset;
+  if (!state) return;
+  // Encoding for: add x3, x1, x2  -> 0x002081B3
+  const uint32_t sub_x3_x1_x2 = 0x202081B3u; // 0010(2) 0000(0)  0010(2) 0000(0) 1000(8) 0001(1) 1011(B) 0011(3)
+  // 0010000 -> 0x20 -> funct7 = SUB
+  
+  state->memory[offset] = sub_x3_x1_x2; // word at index 0
+  state->regs[REG_x1] = 10;
+  state->regs[REG_x2] = 5;
+  state->pc = offset;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+
+
+//temporary functions for testing other R-type operations
+void load_test_xor_program(risc_v_state *state) {
+  if (!state) return;
+  // Encoding for: xor x3, x1, x2  -> 0x0020C1B3
+  const uint32_t xor_x3_x1_x2 = 0x0020C1B3u; //  0010(2) 0000(0) 1100(C) 0001(1) 1011(B) 0011(3)
+  state->memory[0] = xor_x3_x1_x2;
+  state->regs[REG_x1] = 10; // 0b1010
+  state->regs[REG_x2] = 12; // 0b1100
   state->pc = 0;
   state->is_valid = true;
   state->is_running = true;
 }
 
+void load_test_or_program(risc_v_state *state) {
+  if (!state) return;
+  // Encoding for: or x3, x1, x2  -> 0x0020E1B3
+  const uint32_t or_x3_x1_x2 = 0x0020E1B3u;
+  state->memory[0] = or_x3_x1_x2;
+  state->regs[REG_x1] = 10;
+  state->regs[REG_x2] = 12;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test_and_program(risc_v_state *state) {
+  if (!state) return;
+  // Encoding for: and x3, x1, x2  -> 0x0020F1B3
+  const uint32_t and_x3_x1_x2 = 0x0020F1B3u;
+  state->memory[0] = and_x3_x1_x2;
+  state->regs[REG_x1] = 10;
+  state->regs[REG_x2] = 12;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test_sll_program(risc_v_state *state) {
+  if (!state) return;
+  // Encoding for: sll x3, x1, x2  -> 0x002091B3
+  const uint32_t sll_x3_x1_x2 = 0x002091B3u;
+  state->memory[0] = sll_x3_x1_x2;
+  state->regs[REG_x1] = 3; // value to shift
+  state->regs[REG_x2] = 1; // shift amount (lower 5 bits)
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test_srl_program(risc_v_state *state) {
+  if (!state) return;
+  // Encoding for: srl x3, x1, x2  -> 0x0020D1B3
+  const uint32_t srl_x3_x1_x2 = 0x0020D1B3u;
+  state->memory[0] = srl_x3_x1_x2;
+  state->regs[REG_x1] = 8; // value to shift
+  state->regs[REG_x2] = 1; // shift amount
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test_sra_program(risc_v_state *state) {
+  if (!state) return;
+  // Encoding for: sra x3, x1, x2  -> 0x4020D1B3
+  const uint32_t sra_x3_x1_x2 = 0x4020D1B3u;
+  state->memory[0] = sra_x3_x1_x2;
+  state->regs[REG_x1] = 0xFFFFFFF8u; // -8 in two's complement
+  state->regs[REG_x2] = 1; // shift amount
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test_slt_program(risc_v_state *state) {
+  if (!state) return;
+  // Encoding for: slt x3, x1, x2  -> 0x0020A1B3
+  const uint32_t slt_x3_x1_x2 = 0x0020A1B3u;
+  state->memory[0] = slt_x3_x1_x2;
+  state->regs[REG_x1] = 0xFFFFFFFFu; // -1 (signed)
+  state->regs[REG_x2] = 1;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test_sltu_program(risc_v_state *state) {
+  if (!state) return;
+  // Encoding for: sltu x3, x1, x2  -> 0x0020B1B3
+  const uint32_t sltu_x3_x1_x2 = 0x0020B1B3u;
+  state->memory[0] = sltu_x3_x1_x2;
+  state->regs[REG_x1] = 1u;
+  state->regs[REG_x2] = 2u;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test(risc_v_state* state){
+  // we'd load all tests so so far...
+  uint8_t* mem_offset = malloc(sizeof(uint8_t));
+  *mem_offset = 0;
+  load_test_sub_program(state, mem_offset);
+}
+
+
 int main(void) {
   risc_v_state state;
   TRY_OR_EXIT(init_riscv_emu(&state), "Failed to initialize riscv state");
-  load_test_add_program(&state);
+  load_test(&state);
   emulate(&state);
   
   print_registers(&state);
