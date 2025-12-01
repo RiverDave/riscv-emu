@@ -100,6 +100,7 @@ bool init_riscv_emu(risc_v_state *state) {
 typedef enum {
   ADD,
   SUB,
+  ADDI,
 } Opcode;
 
 // source:
@@ -113,7 +114,7 @@ enum IFormat {
 
 typedef struct {
   Opcode name;
-  uint8_t ops[3];
+  uint32_t ops[3];
 } Instruction;
 
 bool decode_instruction(risc_v_state *state, const uint32_t instruction,
@@ -130,7 +131,7 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
         // 0x1F -> 0001 1111 | mask for (rs1) [19:15] bits
         // 0x1F -> 0001 1111 | mask for (rs2) [24:20] bits
         // 0x7F -> 0111 1111 | mask for (funct7) [32:25] bits
-        uint32_t rd = ((instruction >> 7) & 0x1F);
+        uint32_t rd = ((instruction >> 7) & 0x1F); 
         uint32_t funct3 = ((instruction >> 12) & 0x7);
         uint32_t rs1 = ((instruction >> 15) & 0x1F);
         uint32_t rs2 = ((instruction >> 20) & 0x1F);
@@ -155,6 +156,36 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
         output->ops[1] = rs1;
         output->ops[2] = rs2;
         return true; // success
+    } break;
+
+    case I_FMT: {
+
+        // 0x7F -> 0111 1111 | mask for (opcode) [6:0] bits
+        // 0x1F -> 0001 1111 | mask for (rd) [11:7] bits
+        // 0x7 -> 0000 0111 | mask for (funct3) [14:12] bits
+        // 0x1F -> 0001 1111 | mask for (rs1) [19:15] bits
+        // ((instruction >> initial_bit_position) & (bit_width) ) = ((instruction >> 20) && 0xFFF)
+        uint32_t rd = ((instruction >> 7) & 0x1F); 
+        uint32_t funct3 = ((instruction >> 12) & 0x7);
+        uint32_t rs1 = ((instruction >> 15) & 0x1F);
+        uint32_t imm = (instruction >> 20 & 0xFFF);
+
+        switch (funct3) {
+
+          case 0x00:{ // addi
+            output->name = ADDI;
+          }break;
+          default: assert(false && "I-FMT instruction not implemented");
+        
+        }
+        
+        output->ops[0] = rd;
+        output->ops[1] = rs1;
+        output->ops[2] = imm;
+        return true; // success
+      assert((rd < REG_COUNT && rs1 < REG_COUNT) &&
+          "Invalid register val");
+
     } break;
     default:{
         if(!opcode)
@@ -194,24 +225,39 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
   if (!state || !insn) return;
   switch (insn->name) {
   case ADD: {
-    uint8_t rd  = insn->ops[0];
-    uint8_t rs1 = insn->ops[1];
-    uint8_t rs2 = insn->ops[2];
-    if (rd != REG_x0)
+    uint32_t rd  = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
+    if (rd != REG_x0) // register x0 is read only
       state->regs[rd] = state->regs[rs1] + state->regs[rs2];
     state->pc+=4;
     break;
   }
   case SUB: {
-    uint8_t rd  = insn->ops[0];
-    uint8_t rs1 = insn->ops[1];
-    uint8_t rs2 = insn->ops[2];
+    uint32_t rd  = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
     if (rd != REG_x0)
       state->regs[rd] = state->regs[rs1] - state->regs[rs2];
     state->pc+=4;
     break;
   }
+  case ADDI: {
+    uint32_t rd  = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    int32_t imm = insn->ops[2];
+
+    // preserve signedneness on immediate
+    if(imm & 0x800) // check if the signed bit is set.
+      imm |= 0xFFFFF000; // fill upper bits with 1's
+
+    if (rd != REG_x0)
+      state->regs[rd] = state->regs[rs1] + imm;
+    state->pc+=4;
+  } break;
+
   default:
+  assert(false && "NYI");
     break;
   }
 }
@@ -364,11 +410,27 @@ void load_test_sltu_program(risc_v_state *state) {
   state->is_running = true;
 }
 
+void load_test_addi_program(risc_v_state *state, const uint8_t* passed_mem_offset) { 
+  if (!state) return;
+
+  uint32_t offset = 0;
+  if(passed_mem_offset) offset = *passed_mem_offset;
+  // Encoding for: addi x3, x1, 10  -> imm[11:0]=0x00A, rs1=1, funct3=0, rd=3, opcode=0x13
+  // instruction = 0x00A08193
+  const uint32_t addi_x3_x1_10 = 0x00A08193u;
+  state->memory[offset] = addi_x3_x1_10;
+  state->regs[REG_x1] = 5; // base value
+  state->pc = 0 + offset;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
 void load_test(risc_v_state* state){
   // we'd load all tests so so far...
   uint8_t* mem_offset = malloc(sizeof(uint8_t));
   *mem_offset = 0;
-  load_test_sub_program(state, mem_offset);
+  // load_test_sub_program(state, mem_offset);
+  load_test_addi_program(state, NULL);
 }
 
 

@@ -1,1 +1,6 @@
-int main(void){int a = 2 + 2; a++; return 0;}
+int main() {
+  int x = 10;
+  int y = 5;
+  int z = x - y;
+  return z;
+}
