@@ -101,6 +101,7 @@ typedef enum {
   ADD,
   SUB,
   ADDI,
+  SW,
 } Opcode;
 
 // source:
@@ -108,6 +109,7 @@ typedef enum {
 enum IFormat {
   R_FMT = 0x33,
   I_FMT = 0x13,
+  S_FMT = 0x23,
   SB_FMT, // TODO, this whole enum might not be needed
   UJ_FMT
 };
@@ -187,6 +189,34 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
           "Invalid register val");
 
     } break;
+
+    case S_FMT: {
+      uint32_t funct3 = ((instruction >> 12) & 0x7);
+      uint32_t rs1 = ((instruction >> 15) & 0x1F);
+      uint32_t rs2 = ((instruction >> 20) & 0x1F);
+
+      // imm's are split in this instruction (god knows why lol)
+      // these imms need to be sign extended on execution.
+      uint32_t imm_1 = ((instruction >> 7) & 0x1F);
+      uint32_t imm_2 = ((instruction >> 25) & 0x7F);
+      uint32_t imm_final = (imm_2 << 5) | imm_1;
+
+      switch (funct3) {
+
+        case 0x2: { // sw
+          output->name = SW;
+        }break;
+        default: assert(false && "S-FMT instruction not implemented");
+      
+      }
+      
+      // ops: [rs1, rs2, imm]
+      output->ops[0] = rs1;
+      output->ops[1] = rs2;
+      output->ops[2] = imm_final;
+
+      return true;
+    } break;
     default:{
         if(!opcode)
             return true; // temporarily, this should crash
@@ -213,6 +243,17 @@ void print_registers(const risc_v_state *state) {
   for (int i = 0; i < REG_COUNT; ++i) {
     printf("%2d  %-12s 0x%08x %10u\n", i, reg_names[i], state->regs[i],
            state->regs[i]);
+  }
+}
+
+void print_memory(const risc_v_state *state, uint32_t start_addr_bytes, uint32_t word_count) {
+  if (!state) return;
+  puts("-- Memory --");
+  puts("Addr       Hex");
+  uint32_t start_index = start_addr_bytes / sizeof(uint32_t);
+  for (uint32_t i = 0; i < word_count && (start_index + i) < MEMORY_SIZE; ++i) {
+    uint32_t index = start_index + i;
+    printf("0x%08x 0x%08x\n", (unsigned int)(index * sizeof(uint32_t)), state->memory[index]);
   }
 }
 
@@ -255,6 +296,32 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
       state->regs[rd] = state->regs[rs1] + imm;
     state->pc+=4;
   } break;
+
+  case SW: {
+
+    // Store word: compute effective address and write rs2 value into memory
+    uint32_t rs1 = insn->ops[0]; // base register
+    uint32_t rs2 = insn->ops[1]; // source register (value to store)
+    int32_t imm = insn->ops[2];
+
+    // sign-extend 12-bit immediate
+    if (imm & 0x800)
+      imm |= 0xFFFFF000;
+
+    uint32_t addr = state->regs[rs1] + imm; // byte address
+    // convert to word index
+    if (addr % sizeof(uint32_t) != 0) {
+      // unaligned store: for this simple emulator we require word-aligned addresses
+      assert(false && "Unaligned sw not supported");
+    }
+    uint32_t index = addr / sizeof(uint32_t);
+    if (index >= MEMORY_SIZE) {
+      assert(false && "sw address out of range");
+    }
+
+    state->memory[index] = state->regs[rs2];
+    state->pc += 4;
+  }break;
 
   default:
   assert(false && "NYI");
@@ -410,6 +477,21 @@ void load_test_sltu_program(risc_v_state *state) {
   state->is_running = true;
 }
 
+void load_test_sw_program(risc_v_state *state, const uint8_t* passed_mem_offset) {
+  uint8_t offset = 0; if(passed_mem_offset) offset = *passed_mem_offset;
+  if (!state) return;
+  // Encoding for: sw x2, 0(x1)
+  // imm[11:5]=0, rs2=2, rs1=1, funct3=0x2, imm[4:0]=0, opcode=0x23 -> 0x0020A023
+  const uint32_t sw_x2_0_x1 = 0x0020A023u;
+  state->memory[0] = sw_x2_0_x1;
+  // Prepare registers: base in x1, value in x2
+  state->regs[REG_x1] = 0; // base address 0
+  state->regs[REG_x2] = 0xDEADBEEFu; // value to store
+  state->pc = offset;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
 void load_test_addi_program(risc_v_state *state, const uint8_t* passed_mem_offset) { 
   if (!state) return;
 
@@ -430,7 +512,8 @@ void load_test(risc_v_state* state){
   uint8_t* mem_offset = malloc(sizeof(uint8_t));
   *mem_offset = 0;
   // load_test_sub_program(state, mem_offset);
-  load_test_addi_program(state, NULL);
+  // load_test_addi_program(state, NULL);
+  load_test_sw_program(state, NULL);
 }
 
 
@@ -439,8 +522,11 @@ int main(void) {
   TRY_OR_EXIT(init_riscv_emu(&state), "Failed to initialize riscv state");
   load_test(&state);
   emulate(&state);
+
+  assert(state.memory[state.regs[REG_x1]] == 0xDEADBEEFu); // some sw tests
   
-  print_registers(&state);
+  // print_registers(&state);
+  print_memory(&state, 0x0, 12);
 
   return EXIT_SUCCESS;
 }
