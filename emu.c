@@ -97,18 +97,14 @@ bool init_riscv_emu(risc_v_state *state) {
   return true;
 }
 
-typedef enum {
-  ADD,
-  SUB,
-  ADDI,
-  SW,
-} Opcode;
+typedef enum { ADD, SUB, ADDI, SW, LW } Opcode;
 
 // source:
 // https://www.cs.sfu.ca/~ashriram/Courses/CS295/assets/notebooks/RISCV/RISCV_CARD.pdf
 enum IFormat {
   R_FMT = 0x33,
   I_FMT = 0x13,
+  LOAD_FMT = 0x03,
   S_FMT = 0x23,
   SB_FMT, // TODO, this whole enum might not be needed
   UJ_FMT
@@ -119,112 +115,137 @@ typedef struct {
   uint32_t ops[3];
 } Instruction;
 
+bool is_address_valid(const uint32_t addr) {
+  if (addr % sizeof(uint32_t) != 0)
+    return false;
+  uint32_t index = addr / sizeof(uint32_t);
+  return index < MEMORY_SIZE;
+}
+
 bool decode_instruction(risc_v_state *state, const uint32_t instruction,
                         Instruction *output) {
-  if(!state || !output) return false;
+  if (!state || !output)
+    return false;
 
   uint32_t opcode = ((instruction >> 0) & 0x7F);
   switch (opcode) {
-    case R_FMT: {
+  case R_FMT: {
 
-        // 0x7F -> 0111 1111 | mask for (opcode) [6:0] bits
-        // 0x1F -> 0001 1111 | mask for (rd) [11:7] bits
-        // 0x7 -> 0000 0111 | mask for (funct3) [14:12] bits
-        // 0x1F -> 0001 1111 | mask for (rs1) [19:15] bits
-        // 0x1F -> 0001 1111 | mask for (rs2) [24:20] bits
-        // 0x7F -> 0111 1111 | mask for (funct7) [32:25] bits
-        uint32_t rd = ((instruction >> 7) & 0x1F); 
-        uint32_t funct3 = ((instruction >> 12) & 0x7);
-        uint32_t rs1 = ((instruction >> 15) & 0x1F);
-        uint32_t rs2 = ((instruction >> 20) & 0x1F);
-        uint32_t funct7 = ((instruction >> 25) & 0x7F);
+    // 0x7F -> 0111 1111 | mask for (opcode) [6:0] bits
+    // 0x1F -> 0001 1111 | mask for (rd) [11:7] bits
+    // 0x7 -> 0000 0111 | mask for (funct3) [14:12] bits
+    // 0x1F -> 0001 1111 | mask for (rs1) [19:15] bits
+    // 0x1F -> 0001 1111 | mask for (rs2) [24:20] bits
+    // 0x7F -> 0111 1111 | mask for (funct7) [32:25] bits
+    uint32_t rd = ((instruction >> 7) & 0x1F);
+    uint32_t funct3 = ((instruction >> 12) & 0x7);
+    uint32_t rs1 = ((instruction >> 15) & 0x1F);
+    uint32_t rs2 = ((instruction >> 20) & 0x1F);
+    uint32_t funct7 = ((instruction >> 25) & 0x7F);
 
-        switch (funct3) {
-            case 0x00: {
-            if (!funct7)
-                output->name = ADD;
-            else
-                output->name = SUB;
-            }
-            break;
-
-            default:
-             return false;
-
-        }
-        assert((rd < REG_COUNT && rs1 < REG_COUNT && rs2 < REG_COUNT) &&
-            "Invalid register val");
-        output->ops[0] = rd;
-        output->ops[1] = rs1;
-        output->ops[2] = rs2;
-        return true; // success
+    switch (funct3) {
+    case 0x00: {
+      if (!funct7)
+        output->name = ADD;
+      else
+        output->name = SUB;
     } break;
 
-    case I_FMT: {
-
-        // 0x7F -> 0111 1111 | mask for (opcode) [6:0] bits
-        // 0x1F -> 0001 1111 | mask for (rd) [11:7] bits
-        // 0x7 -> 0000 0111 | mask for (funct3) [14:12] bits
-        // 0x1F -> 0001 1111 | mask for (rs1) [19:15] bits
-        // ((instruction >> initial_bit_position) & (bit_width) ) = ((instruction >> 20) && 0xFFF)
-        uint32_t rd = ((instruction >> 7) & 0x1F); 
-        uint32_t funct3 = ((instruction >> 12) & 0x7);
-        uint32_t rs1 = ((instruction >> 15) & 0x1F);
-        uint32_t imm = (instruction >> 20 & 0xFFF);
-
-        switch (funct3) {
-
-          case 0x00:{ // addi
-            output->name = ADDI;
-          }break;
-          default: assert(false && "I-FMT instruction not implemented");
-        
-        }
-        
-        output->ops[0] = rd;
-        output->ops[1] = rs1;
-        output->ops[2] = imm;
-        return true; // success
-      assert((rd < REG_COUNT && rs1 < REG_COUNT) &&
-          "Invalid register val");
-
-    } break;
-
-    case S_FMT: {
-      uint32_t funct3 = ((instruction >> 12) & 0x7);
-      uint32_t rs1 = ((instruction >> 15) & 0x1F);
-      uint32_t rs2 = ((instruction >> 20) & 0x1F);
-
-      // imm's are split in this instruction (god knows why lol)
-      // these imms need to be sign extended on execution.
-      uint32_t imm_1 = ((instruction >> 7) & 0x1F);
-      uint32_t imm_2 = ((instruction >> 25) & 0x7F);
-      uint32_t imm_final = (imm_2 << 5) | imm_1;
-
-      switch (funct3) {
-
-        case 0x2: { // sw
-          output->name = SW;
-        }break;
-        default: assert(false && "S-FMT instruction not implemented");
-      
-      }
-      
-      // ops: [rs1, rs2, imm]
-      output->ops[0] = rs1;
-      output->ops[1] = rs2;
-      output->ops[2] = imm_final;
-
-      return true;
-    } break;
-    default:{
-        if(!opcode)
-            return true; // temporarily, this should crash
-                         // Will make it work after we figure out syscalls
-                         
-
+    default:
+      return false;
     }
-    
+    assert((rd < REG_COUNT && rs1 < REG_COUNT && rs2 < REG_COUNT) &&
+           "Invalid register val");
+    output->ops[0] = rd;
+    output->ops[1] = rs1;
+    output->ops[2] = rs2;
+    return true; // success
+  } break;
+
+  case I_FMT: {
+
+    // 0x7F -> 0111 1111 | mask for (opcode) [6:0] bits
+    // 0x1F -> 0001 1111 | mask for (rd) [11:7] bits
+    // 0x7 -> 0000 0111 | mask for (funct3) [14:12] bits
+    // 0x1F -> 0001 1111 | mask for (rs1) [19:15] bits
+    // ((instruction >> initial_bit_position) & (bit_width) ) = ((instruction >>
+    // 20) && 0xFFF)
+    uint32_t rd = ((instruction >> 7) & 0x1F);
+    uint32_t funct3 = ((instruction >> 12) & 0x7);
+    uint32_t rs1 = ((instruction >> 15) & 0x1F);
+    uint32_t imm = (instruction >> 20 & 0xFFF);
+
+    switch (funct3) {
+
+    case 0x00: { // addi
+      output->name = ADDI;
+    } break;
+    default:
+      assert(false && "I-FMT instruction not implemented");
+    }
+
+    output->ops[0] = rd;
+    output->ops[1] = rs1;
+    output->ops[2] = imm;
+    return true; // success
+    assert((rd < REG_COUNT && rs1 < REG_COUNT) && "Invalid register val");
+
+  } break;
+
+  case LOAD_FMT: {
+    // this format has the same composition as I fmt
+    // I-type loads (opcode 0x03)
+    uint32_t rd = ((instruction >> 7) & 0x1F);
+    uint32_t funct3 = ((instruction >> 12) & 0x7);
+    uint32_t rs1 = ((instruction >> 15) & 0x1F);
+    uint32_t imm = (instruction >> 20) & 0xFFF;
+
+    switch (funct3) {
+    case 0x2: // lw
+      output->name = LW;
+      break;
+    default:
+      return false;
+    }
+
+    output->ops[0] = rd;
+    output->ops[1] = rs1;
+    output->ops[2] = imm;
+    return true;
+  } break;
+
+  case S_FMT: {
+    uint32_t funct3 = ((instruction >> 12) & 0x7);
+    uint32_t rs1 = ((instruction >> 15) & 0x1F);
+    uint32_t rs2 = ((instruction >> 20) & 0x1F);
+
+    // imm's are split in this instruction (god knows why lol)
+    // these imms need to be sign extended on execution.
+    uint32_t imm_1 = ((instruction >> 7) & 0x1F);
+    uint32_t imm_2 = ((instruction >> 25) & 0x7F);
+    uint32_t imm_final = (imm_2 << 5) | imm_1;
+
+    switch (funct3) {
+
+    case 0x2: { // sw
+      output->name = SW;
+    } break;
+    default:
+      assert(false && "S-FMT instruction not implemented");
+    }
+
+    // ops: [rs1, rs2, imm]
+    output->ops[0] = rs1;
+    output->ops[1] = rs2;
+    output->ops[2] = imm_final;
+
+    return true;
+  } break;
+  default: {
+    if (!opcode)
+      return true; // temporarily, this should crash
+                   // Will make it work after we figure out syscalls
+  }
   }
   return false;
 }
@@ -246,55 +267,60 @@ void print_registers(const risc_v_state *state) {
   }
 }
 
-void print_memory(const risc_v_state *state, uint32_t start_addr_bytes, uint32_t word_count) {
-  if (!state) return;
+void print_memory(const risc_v_state *state, uint32_t start_addr_bytes,
+                  uint32_t word_count) {
+  if (!state)
+    return;
   puts("-- Memory --");
   puts("Addr       Hex");
   uint32_t start_index = start_addr_bytes / sizeof(uint32_t);
   for (uint32_t i = 0; i < word_count && (start_index + i) < MEMORY_SIZE; ++i) {
     uint32_t index = start_index + i;
-    printf("0x%08x 0x%08x\n", (unsigned int)(index * sizeof(uint32_t)), state->memory[index]);
+    printf("0x%08x 0x%08x\n", (unsigned int)(index * sizeof(uint32_t)),
+           state->memory[index]);
   }
 }
 
 bool is_riscv_state_valid(const risc_v_state *state) {
   // may add more stuff in here
-  return state->is_valid && state->is_running && state->pc < MEMORY_SIZE && state->memory[state->pc] != 0x00;
+  return state->is_valid && state->is_running && state->pc < MEMORY_SIZE &&
+         state->memory[state->pc] != 0x00;
 }
 
 void execute_instruction(risc_v_state *state, const Instruction *insn) {
-  if (!state || !insn) return;
+  if (!state || !insn)
+    return;
   switch (insn->name) {
   case ADD: {
-    uint32_t rd  = insn->ops[0];
+    uint32_t rd = insn->ops[0];
     uint32_t rs1 = insn->ops[1];
     uint32_t rs2 = insn->ops[2];
     if (rd != REG_x0) // register x0 is read only
       state->regs[rd] = state->regs[rs1] + state->regs[rs2];
-    state->pc+=4;
+    state->pc += 4;
     break;
   }
   case SUB: {
-    uint32_t rd  = insn->ops[0];
+    uint32_t rd = insn->ops[0];
     uint32_t rs1 = insn->ops[1];
     uint32_t rs2 = insn->ops[2];
     if (rd != REG_x0)
       state->regs[rd] = state->regs[rs1] - state->regs[rs2];
-    state->pc+=4;
+    state->pc += 4;
     break;
   }
   case ADDI: {
-    uint32_t rd  = insn->ops[0];
+    uint32_t rd = insn->ops[0];
     uint32_t rs1 = insn->ops[1];
     int32_t imm = insn->ops[2];
 
     // preserve signedneness on immediate
-    if(imm & 0x800) // check if the signed bit is set.
+    if (imm & 0x800)     // check if the signed bit is set.
       imm |= 0xFFFFF000; // fill upper bits with 1's
 
     if (rd != REG_x0)
       state->regs[rd] = state->regs[rs1] + imm;
-    state->pc+=4;
+    state->pc += 4;
   } break;
 
   case SW: {
@@ -309,22 +335,35 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
       imm |= 0xFFFFF000;
 
     uint32_t addr = state->regs[rs1] + imm; // byte address
-    // convert to word index
-    if (addr % sizeof(uint32_t) != 0) {
-      // unaligned store: for this simple emulator we require word-aligned addresses
-      assert(false && "Unaligned sw not supported");
-    }
+
+    // FIXME The quality of these errors might not be to good rn. will come back
+    // later.
+    TRY_OR_EXIT(is_address_valid(addr), "Invalid address for SW Instruction");
     uint32_t index = addr / sizeof(uint32_t);
-    if (index >= MEMORY_SIZE) {
-      assert(false && "sw address out of range");
-    }
 
     state->memory[index] = state->regs[rs2];
     state->pc += 4;
-  }break;
+  } break;
+
+  case LW: {
+
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    int32_t imm = insn->ops[2];
+
+    // sign-extend 12-bit immediate
+    if (imm & 0x800)
+      imm |= 0xFFFFF000;
+
+    uint32_t addr = state->regs[rs1] + imm; // byte address
+    TRY_OR_EXIT(is_address_valid(addr), "Invalid address for LW Instruction");
+    uint32_t index = addr / sizeof(uint32_t);
+    state->regs[rd] = state->memory[index];
+    state->pc += 4;
+  } break;
 
   default:
-  assert(false && "NYI");
+    assert(false && "NYI");
     break;
   }
 }
@@ -334,27 +373,30 @@ bool emulate(risc_v_state *state) {
 
   state->is_running = true;
   state->is_valid = true;
-  while (is_riscv_state_valid(state)){
+  while (is_riscv_state_valid(state)) {
 
     // 1. Calculate the array index corresponding to the PC byte address.
-    uint32_t index = state->pc / sizeof(uint32_t); 
+    uint32_t index = state->pc / sizeof(uint32_t);
     // 2. Fetch the instruction word using the index.
     const uint32_t word = state->memory[index];
     Instruction instruction;
-    TRY_OR_EXIT(decode_instruction(state, word, &instruction), "Failed to decode instruction");
+    TRY_OR_EXIT(decode_instruction(state, word, &instruction),
+                "Failed to decode instruction");
     execute_instruction(state, &instruction);
   }
 
-    return true;
+  return true;
 }
 
-//temporary function for testing
+// temporary function for testing
 void load_test_add_program(risc_v_state *state, const uint8_t mem_offset) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: add x3, x1, x2  -> 0x002081B3
-  const uint32_t add_x3_x1_x2 = 0x002081B3u; // 0000(0) 0000(0)  0010(2) 0000(0) 1000(8) 0001(1) 1011(B) 0011(3)
+  const uint32_t add_x3_x1_x2 = 0x002081B3u; // 0000(0) 0000(0)  0010(2) 0000(0)
+                                             // 1000(8) 0001(1) 1011(B) 0011(3)
   // 0000000 -> 0x20 -> funct7 = ADD
-  
+
   state->memory[0 + mem_offset] = add_x3_x1_x2; // word at index 0
   state->regs[REG_x1] = 5;
   state->regs[REG_x2] = 7;
@@ -363,13 +405,18 @@ void load_test_add_program(risc_v_state *state, const uint8_t mem_offset) {
   state->is_running = true;
 }
 
-void load_test_sub_program(risc_v_state *state, const uint8_t* passed_mem_offset) {
-  uint8_t offset = 0; if(passed_mem_offset) offset = *passed_mem_offset;
-  if (!state) return;
+void load_test_sub_program(risc_v_state *state,
+                           const uint8_t *passed_mem_offset) {
+  uint8_t offset = 0;
+  if (passed_mem_offset)
+    offset = *passed_mem_offset;
+  if (!state)
+    return;
   // Encoding for: add x3, x1, x2  -> 0x002081B3
-  const uint32_t sub_x3_x1_x2 = 0x202081B3u; // 0010(2) 0000(0)  0010(2) 0000(0) 1000(8) 0001(1) 1011(B) 0011(3)
+  const uint32_t sub_x3_x1_x2 = 0x202081B3u; // 0010(2) 0000(0)  0010(2) 0000(0)
+                                             // 1000(8) 0001(1) 1011(B) 0011(3)
   // 0010000 -> 0x20 -> funct7 = SUB
-  
+
   state->memory[offset] = sub_x3_x1_x2; // word at index 0
   state->regs[REG_x1] = 10;
   state->regs[REG_x2] = 5;
@@ -378,13 +425,13 @@ void load_test_sub_program(risc_v_state *state, const uint8_t* passed_mem_offset
   state->is_running = true;
 }
 
-
-
-//temporary functions for testing other R-type operations
+// temporary functions for testing other R-type operations
 void load_test_xor_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: xor x3, x1, x2  -> 0x0020C1B3
-  const uint32_t xor_x3_x1_x2 = 0x0020C1B3u; //  0010(2) 0000(0) 1100(C) 0001(1) 1011(B) 0011(3)
+  const uint32_t xor_x3_x1_x2 =
+      0x0020C1B3u; //  0010(2) 0000(0) 1100(C) 0001(1) 1011(B) 0011(3)
   state->memory[0] = xor_x3_x1_x2;
   state->regs[REG_x1] = 10; // 0b1010
   state->regs[REG_x2] = 12; // 0b1100
@@ -394,7 +441,8 @@ void load_test_xor_program(risc_v_state *state) {
 }
 
 void load_test_or_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: or x3, x1, x2  -> 0x0020E1B3
   const uint32_t or_x3_x1_x2 = 0x0020E1B3u;
   state->memory[0] = or_x3_x1_x2;
@@ -406,7 +454,8 @@ void load_test_or_program(risc_v_state *state) {
 }
 
 void load_test_and_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: and x3, x1, x2  -> 0x0020F1B3
   const uint32_t and_x3_x1_x2 = 0x0020F1B3u;
   state->memory[0] = and_x3_x1_x2;
@@ -418,7 +467,8 @@ void load_test_and_program(risc_v_state *state) {
 }
 
 void load_test_sll_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: sll x3, x1, x2  -> 0x002091B3
   const uint32_t sll_x3_x1_x2 = 0x002091B3u;
   state->memory[0] = sll_x3_x1_x2;
@@ -430,7 +480,8 @@ void load_test_sll_program(risc_v_state *state) {
 }
 
 void load_test_srl_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: srl x3, x1, x2  -> 0x0020D1B3
   const uint32_t srl_x3_x1_x2 = 0x0020D1B3u;
   state->memory[0] = srl_x3_x1_x2;
@@ -442,19 +493,21 @@ void load_test_srl_program(risc_v_state *state) {
 }
 
 void load_test_sra_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: sra x3, x1, x2  -> 0x4020D1B3
   const uint32_t sra_x3_x1_x2 = 0x4020D1B3u;
   state->memory[0] = sra_x3_x1_x2;
   state->regs[REG_x1] = 0xFFFFFFF8u; // -8 in two's complement
-  state->regs[REG_x2] = 1; // shift amount
+  state->regs[REG_x2] = 1;           // shift amount
   state->pc = 0;
   state->is_valid = true;
   state->is_running = true;
 }
 
 void load_test_slt_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: slt x3, x1, x2  -> 0x0020A1B3
   const uint32_t slt_x3_x1_x2 = 0x0020A1B3u;
   state->memory[0] = slt_x3_x1_x2;
@@ -466,7 +519,8 @@ void load_test_slt_program(risc_v_state *state) {
 }
 
 void load_test_sltu_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   // Encoding for: sltu x3, x1, x2  -> 0x0020B1B3
   const uint32_t sltu_x3_x1_x2 = 0x0020B1B3u;
   state->memory[0] = sltu_x3_x1_x2;
@@ -477,28 +531,59 @@ void load_test_sltu_program(risc_v_state *state) {
   state->is_running = true;
 }
 
-void load_test_sw_program(risc_v_state *state, const uint8_t* passed_mem_offset) {
-  uint8_t offset = 0; if(passed_mem_offset) offset = *passed_mem_offset;
-  if (!state) return;
+void load_test_sw_program(risc_v_state *state,
+                          const uint8_t *passed_mem_offset) {
+  uint8_t offset = 0;
+  if (passed_mem_offset)
+    offset = *passed_mem_offset;
+  if (!state)
+    return;
   // Encoding for: sw x2, 0(x1)
-  // imm[11:5]=0, rs2=2, rs1=1, funct3=0x2, imm[4:0]=0, opcode=0x23 -> 0x0020A023
+  // imm[11:5]=0, rs2=2, rs1=1, funct3=0x2, imm[4:0]=0, opcode=0x23 ->
+  // 0x0020A023
   const uint32_t sw_x2_0_x1 = 0x0020A023u;
   state->memory[0] = sw_x2_0_x1;
   // Prepare registers: base in x1, value in x2
-  state->regs[REG_x1] = 0; // base address 0
+  state->regs[REG_x1] = 0;           // base address 0
   state->regs[REG_x2] = 0xDEADBEEFu; // value to store
   state->pc = offset;
   state->is_valid = true;
   state->is_running = true;
 }
 
-void load_test_addi_program(risc_v_state *state, const uint8_t* passed_mem_offset) { 
-  if (!state) return;
+void load_test_lw_program(risc_v_state *state,
+                          const uint8_t *passed_mem_offset) {
+  uint8_t offset = 0;
+  if (passed_mem_offset)
+    offset = *passed_mem_offset;
+  if (!state)
+    return;
+  // Place a data word at memory[1] (byte addr 4)
+  state->memory[1] = 0xCAFEBABEu;
+
+  // Encoding for: lw x3, 4(x1)
+  // imm=4, rs1=1, funct3=0x2, rd=3, opcode=0x03 -> construct 32-bit
+  // (this is a much better way to encode instructions)
+  const uint32_t lw_x3_4_x1 =
+      (4u << 20) | (1u << 15) | (0x2u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lw_x3_4_x1;
+  state->regs[REG_x1] = 0; // base
+  state->regs[REG_x3] = 0;
+  state->pc = offset;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+void load_test_addi_program(risc_v_state *state,
+                            const uint8_t *passed_mem_offset) {
+  if (!state)
+    return;
 
   uint32_t offset = 0;
-  if(passed_mem_offset) offset = *passed_mem_offset;
-  // Encoding for: addi x3, x1, 10  -> imm[11:0]=0x00A, rs1=1, funct3=0, rd=3, opcode=0x13
-  // instruction = 0x00A08193
+  if (passed_mem_offset)
+    offset = *passed_mem_offset;
+  // Encoding for: addi x3, x1, 10  -> imm[11:0]=0x00A, rs1=1, funct3=0, rd=3,
+  // opcode=0x13 instruction = 0x00A08193
   const uint32_t addi_x3_x1_10 = 0x00A08193u;
   state->memory[offset] = addi_x3_x1_10;
   state->regs[REG_x1] = 5; // base value
@@ -507,15 +592,16 @@ void load_test_addi_program(risc_v_state *state, const uint8_t* passed_mem_offse
   state->is_running = true;
 }
 
-void load_test(risc_v_state* state){
+void load_test(risc_v_state *state) {
   // we'd load all tests so so far...
-  uint8_t* mem_offset = malloc(sizeof(uint8_t));
+  uint8_t *mem_offset = malloc(sizeof(uint8_t));
   *mem_offset = 0;
   // load_test_sub_program(state, mem_offset);
   // load_test_addi_program(state, NULL);
-  load_test_sw_program(state, NULL);
+  // load_test_sw_program(state, NULL);
+  // run lw test by default
+  load_test_lw_program(state, NULL);
 }
-
 
 int main(void) {
   risc_v_state state;
@@ -523,9 +609,10 @@ int main(void) {
   load_test(&state);
   emulate(&state);
 
-  assert(state.memory[state.regs[REG_x1]] == 0xDEADBEEFu); // some sw tests
-  
-  // print_registers(&state);
+  // verify lw loaded the value into x3
+  assert(state.regs[REG_x3] == 0xCAFEBABEu);
+
+  print_registers(&state);
   print_memory(&state, 0x0, 12);
 
   return EXIT_SUCCESS;
