@@ -97,7 +97,7 @@ bool init_riscv_emu(risc_v_state *state) {
   return true;
 }
 
-typedef enum { ADD, SUB, ADDI, SW, LW } Opcode;
+typedef enum { ADD, SUB, ADDI, SW, LW, JALR } Opcode;
 
 // source:
 // https://www.cs.sfu.ca/~ashriram/Courses/CS295/assets/notebooks/RISCV/RISCV_CARD.pdf
@@ -106,7 +106,8 @@ enum IFormat {
   I_FMT = 0x13,
   LOAD_FMT = 0x03,
   S_FMT = 0x23,
-  SB_FMT, // TODO, this whole enum might not be needed
+  I_JMP_FMT = 0x67, // jal and jalr
+  SB_FMT,           // TODO, this whole enum might not be needed
   UJ_FMT
 };
 
@@ -214,6 +215,29 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     return true;
   } break;
 
+  // FIXME: As it is similar to other formats, jmp instructions share the same
+  // format as I fmt, perhaps we can avoid the duplication in the bit extraction
+  // mechanism we utilize below.
+  case I_JMP_FMT: { // used mainly for jalr, Not to confuse with jal which has
+                    // its own opcode.
+
+    uint32_t rd = ((instruction >> 7) & 0x1F);
+    uint32_t funct3 = ((instruction >> 12) & 0x7);
+    uint32_t rs1 = ((instruction >> 15) & 0x1F);
+    uint32_t imm = (instruction >> 20 & 0xFFF);
+
+    if (funct3 ==
+        0x00) // might not be needed but just to make sure we get it right.
+      output->name = JALR;
+    else
+      return false;
+
+    output->ops[0] = rd;
+    output->ops[1] = rs1;
+    output->ops[2] = imm;
+    return true;
+  } break;
+
   case S_FMT: {
     uint32_t funct3 = ((instruction >> 12) & 0x7);
     uint32_t rs1 = ((instruction >> 15) & 0x1F);
@@ -283,8 +307,17 @@ void print_memory(const risc_v_state *state, uint32_t start_addr_bytes,
 
 bool is_riscv_state_valid(const risc_v_state *state) {
   // may add more stuff in here
-  return state->is_valid && state->is_running && state->pc < MEMORY_SIZE &&
-         state->memory[state->pc] != 0x00;
+  if (!state)
+    return false;
+  if (!state->is_valid || !state->is_running)
+    return false;
+  // pc is a byte address; convert to word index for memory accesses
+  if (state->pc % sizeof(uint32_t) != 0)
+    return false;
+  uint32_t index = state->pc / sizeof(uint32_t);
+  if (index >= MEMORY_SIZE)
+    return false;
+  return state->memory[index] != 0x00;
 }
 
 void execute_instruction(risc_v_state *state, const Instruction *insn) {
@@ -360,6 +393,26 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     uint32_t index = addr / sizeof(uint32_t);
     state->regs[rd] = state->memory[index];
     state->pc += 4;
+  } break;
+
+  case JALR: {
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    int32_t imm = insn->ops[2];
+
+    // preserve signedneness on immediate
+    if (imm & 0x800)
+      imm |= 0xFFFFF000;
+
+    // compute target from register value + imm, clear low bit per spec
+    uint32_t jmp_addr = state->regs[rs1] + imm;
+    jmp_addr &= ~1u;
+    TRY_OR_EXIT(is_address_valid(jmp_addr),
+                "Invalid Jump Address for JALR instruction");
+    uint32_t new_ret_addr = state->pc + 4;
+    if (rd != REG_x0)
+      state->regs[rd] = new_ret_addr;
+    state->pc = jmp_addr;
   } break;
 
   default:
@@ -592,15 +645,48 @@ void load_test_addi_program(risc_v_state *state,
   state->is_running = true;
 }
 
+void load_test_jalr_program(risc_v_state *state,
+                            const uint8_t *passed_mem_offset) {
+  uint8_t offset = 0;
+  if (passed_mem_offset)
+    offset = *passed_mem_offset;
+  if (!state)
+    return;
+
+  // Encoding for: jalr x3, 4(x0)
+  // imm=4, rs1=0, funct3=0, rd=3, opcode=0x67 ->
+  // (4<<20)|(0<<15)|(0<<12)|(3<<7)|0x67
+  const uint32_t jalr_imm_bytes =
+      12u; // immediate in bytes used in the jalr instruction
+  const uint32_t jalr_x3_4_x0 =
+      (jalr_imm_bytes << 20) | (0u << 15) | (0u << 12) | (3u << 7) | (0x67u);
+
+  // Encoding for: addi x4, x0, 42 -> (42<<20)|(0<<15)|(0<<12)|(4<<7)|0x13
+  const uint32_t addi_x4_x0_42 =
+      (42u << 20) | (0u << 15) | (0u << 12) | (4u << 7) | (0x13u);
+
+  state->memory[0 + offset] = jalr_x3_4_x0;
+  // place the target instruction at the correct word index derived from the
+  // byte immediate
+  uint32_t target_index = (jalr_imm_bytes / sizeof(uint32_t)) + offset;
+  state->memory[target_index] = addi_x4_x0_42; // should execute after jump
+
+  state->regs[REG_x0] = 0;
+  state->regs[REG_x3] = 0;
+  state->regs[REG_x4] = 0;
+  state->pc = 0 + offset;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
 void load_test(risc_v_state *state) {
   // we'd load all tests so so far...
   uint8_t *mem_offset = malloc(sizeof(uint8_t));
   *mem_offset = 0;
   // load_test_sub_program(state, mem_offset);
   // load_test_addi_program(state, NULL);
-  // load_test_sw_program(state, NULL);
-  // run lw test by default
-  load_test_lw_program(state, NULL);
+  // run jalr test by default
+  load_test_jalr_program(state, NULL);
 }
 
 int main(void) {
@@ -609,8 +695,10 @@ int main(void) {
   load_test(&state);
   emulate(&state);
 
-  // verify lw loaded the value into x3
-  assert(state.regs[REG_x3] == 0xCAFEBABEu);
+  // verify jalr set return address (x3 == 4) and that the jumped-to instruction
+  // executed (x4 == 42)
+  assert(state.regs[REG_x3] == 4u);
+  assert(state.regs[REG_x4] == 42u);
 
   print_registers(&state);
   print_memory(&state, 0x0, 12);
