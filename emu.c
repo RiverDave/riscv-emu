@@ -1,11 +1,12 @@
+#include "emu.h"
+
 #include <assert.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
-/*
 
+/*
 I'm looking for a couple of things...
 
     - I wanna exprese the number of registers in my emulator
@@ -20,71 +21,6 @@ I'm looking for a couple of things...
            in out program
 */
 
-// memory limit
-
-#define MEMORY_SIZE 4096
-#define RISCV32I_STEP_COUNT 4
-
-// Register list X-macro: name and printable string
-#define REGISTERS                                                              \
-  X(x0, "x0/zero")                                                             \
-  X(x1, "x1/ra")                                                               \
-  X(x2, "x2/sp")                                                               \
-  X(x3, "x3/gp")                                                               \
-  X(x4, "x4/tp")                                                               \
-  X(x5, "x5/t0")                                                               \
-  X(x6, "x6/t1")                                                               \
-  X(x7, "x7/t2")                                                               \
-  X(x8, "x8/s0/fp")                                                            \
-  X(x9, "x9/s1")                                                               \
-  X(x10, "x10/a0")                                                             \
-  X(x11, "x11/a1")                                                             \
-  X(x12, "x12/a2")                                                             \
-  X(x13, "x13/a3")                                                             \
-  X(x14, "x14/a4")                                                             \
-  X(x15, "x15/a5")                                                             \
-  X(x16, "x16/a6")                                                             \
-  X(x17, "x17/a7")                                                             \
-  X(x18, "x18/s2")                                                             \
-  X(x19, "x19/s3")                                                             \
-  X(x20, "x20/s4")                                                             \
-  X(x21, "x21/s5")                                                             \
-  X(x22, "x22/s6")                                                             \
-  X(x23, "x23/s7")                                                             \
-  X(x24, "x24/s8")                                                             \
-  X(x25, "x25/s9")                                                             \
-  X(x26, "x26/s10")                                                            \
-  X(x27, "x27/s11")                                                            \
-  X(x28, "x28/t3")                                                             \
-  X(x29, "x29/t4")                                                             \
-  X(x30, "x30/t5")                                                             \
-  X(x31, "x31/t6")
-
-typedef enum {
-#define X(name, str) REG_##name,
-  REGISTERS
-#undef X
-      REG_COUNT
-} regid_t;
-
-#define TRY_OR_EXIT(_func, _msg)                                               \
-  do {                                                                         \
-    if (!(_func)) {                                                            \
-      fprintf(stderr, "Error in %s at line %d: %s\n", __FILE__, __LINE__,      \
-              _msg);                                                           \
-      exit(EXIT_FAILURE);                                                      \
-    }                                                                          \
-  } while (0)
-
-typedef struct {
-  uint32_t regs[REG_COUNT];
-  uint32_t memory[MEMORY_SIZE];
-  uint32_t pc;
-  bool is_valid;
-  bool is_running;
-
-} risc_v_state;
-
 bool init_riscv_emu(risc_v_state *state) {
 
   if (!state)
@@ -96,25 +32,6 @@ bool init_riscv_emu(risc_v_state *state) {
   state->pc = 0;
   return true;
 }
-
-typedef enum { ADD, SUB, ADDI, SW, LW, JALR } Opcode;
-
-// source:
-// https://www.cs.sfu.ca/~ashriram/Courses/CS295/assets/notebooks/RISCV/RISCV_CARD.pdf
-enum IFormat {
-  R_FMT = 0x33,
-  I_FMT = 0x13,
-  LOAD_FMT = 0x03,
-  S_FMT = 0x23,
-  I_JMP_FMT = 0x67, // jal and jalr
-  SB_FMT,           // TODO, this whole enum might not be needed
-  UJ_FMT
-};
-
-typedef struct {
-  Opcode name;
-  uint32_t ops[3];
-} Instruction;
 
 bool is_address_valid(const uint32_t addr) {
   if (addr % sizeof(uint32_t) != 0)
@@ -433,275 +350,25 @@ bool emulate(risc_v_state *state) {
     // 2. Fetch the instruction word using the index.
     const uint32_t word = state->memory[index];
     Instruction instruction;
-    TRY_OR_EXIT(decode_instruction(state, word, &instruction),
-                "Failed to decode instruction");
+    if(!decode_instruction(state, word, &instruction)) {
+      fprintf(stderr, "Failure decoding instruction\n");
+      return false;
+    }
     execute_instruction(state, &instruction);
   }
 
   return true;
 }
 
-// temporary function for testing
-void load_test_add_program(risc_v_state *state, const uint8_t mem_offset) {
-  if (!state)
-    return;
-  // Encoding for: add x3, x1, x2  -> 0x002081B3
-  const uint32_t add_x3_x1_x2 = 0x002081B3u; // 0000(0) 0000(0)  0010(2) 0000(0)
-                                             // 1000(8) 0001(1) 1011(B) 0011(3)
-  // 0000000 -> 0x20 -> funct7 = ADD
-
-  state->memory[0 + mem_offset] = add_x3_x1_x2; // word at index 0
-  state->regs[REG_x1] = 5;
-  state->regs[REG_x2] = 7;
-  state->pc = 0 + mem_offset;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_sub_program(risc_v_state *state,
-                           const uint8_t *passed_mem_offset) {
-  uint8_t offset = 0;
-  if (passed_mem_offset)
-    offset = *passed_mem_offset;
-  if (!state)
-    return;
-  // Encoding for: add x3, x1, x2  -> 0x002081B3
-  const uint32_t sub_x3_x1_x2 = 0x202081B3u; // 0010(2) 0000(0)  0010(2) 0000(0)
-                                             // 1000(8) 0001(1) 1011(B) 0011(3)
-  // 0010000 -> 0x20 -> funct7 = SUB
-
-  state->memory[offset] = sub_x3_x1_x2; // word at index 0
-  state->regs[REG_x1] = 10;
-  state->regs[REG_x2] = 5;
-  state->pc = offset;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-// temporary functions for testing other R-type operations
-void load_test_xor_program(risc_v_state *state) {
-  if (!state)
-    return;
-  // Encoding for: xor x3, x1, x2  -> 0x0020C1B3
-  const uint32_t xor_x3_x1_x2 =
-      0x0020C1B3u; //  0010(2) 0000(0) 1100(C) 0001(1) 1011(B) 0011(3)
-  state->memory[0] = xor_x3_x1_x2;
-  state->regs[REG_x1] = 10; // 0b1010
-  state->regs[REG_x2] = 12; // 0b1100
-  state->pc = 0;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_or_program(risc_v_state *state) {
-  if (!state)
-    return;
-  // Encoding for: or x3, x1, x2  -> 0x0020E1B3
-  const uint32_t or_x3_x1_x2 = 0x0020E1B3u;
-  state->memory[0] = or_x3_x1_x2;
-  state->regs[REG_x1] = 10;
-  state->regs[REG_x2] = 12;
-  state->pc = 0;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_and_program(risc_v_state *state) {
-  if (!state)
-    return;
-  // Encoding for: and x3, x1, x2  -> 0x0020F1B3
-  const uint32_t and_x3_x1_x2 = 0x0020F1B3u;
-  state->memory[0] = and_x3_x1_x2;
-  state->regs[REG_x1] = 10;
-  state->regs[REG_x2] = 12;
-  state->pc = 0;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_sll_program(risc_v_state *state) {
-  if (!state)
-    return;
-  // Encoding for: sll x3, x1, x2  -> 0x002091B3
-  const uint32_t sll_x3_x1_x2 = 0x002091B3u;
-  state->memory[0] = sll_x3_x1_x2;
-  state->regs[REG_x1] = 3; // value to shift
-  state->regs[REG_x2] = 1; // shift amount (lower 5 bits)
-  state->pc = 0;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_srl_program(risc_v_state *state) {
-  if (!state)
-    return;
-  // Encoding for: srl x3, x1, x2  -> 0x0020D1B3
-  const uint32_t srl_x3_x1_x2 = 0x0020D1B3u;
-  state->memory[0] = srl_x3_x1_x2;
-  state->regs[REG_x1] = 8; // value to shift
-  state->regs[REG_x2] = 1; // shift amount
-  state->pc = 0;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_sra_program(risc_v_state *state) {
-  if (!state)
-    return;
-  // Encoding for: sra x3, x1, x2  -> 0x4020D1B3
-  const uint32_t sra_x3_x1_x2 = 0x4020D1B3u;
-  state->memory[0] = sra_x3_x1_x2;
-  state->regs[REG_x1] = 0xFFFFFFF8u; // -8 in two's complement
-  state->regs[REG_x2] = 1;           // shift amount
-  state->pc = 0;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_slt_program(risc_v_state *state) {
-  if (!state)
-    return;
-  // Encoding for: slt x3, x1, x2  -> 0x0020A1B3
-  const uint32_t slt_x3_x1_x2 = 0x0020A1B3u;
-  state->memory[0] = slt_x3_x1_x2;
-  state->regs[REG_x1] = 0xFFFFFFFFu; // -1 (signed)
-  state->regs[REG_x2] = 1;
-  state->pc = 0;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_sltu_program(risc_v_state *state) {
-  if (!state)
-    return;
-  // Encoding for: sltu x3, x1, x2  -> 0x0020B1B3
-  const uint32_t sltu_x3_x1_x2 = 0x0020B1B3u;
-  state->memory[0] = sltu_x3_x1_x2;
-  state->regs[REG_x1] = 1u;
-  state->regs[REG_x2] = 2u;
-  state->pc = 0;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_sw_program(risc_v_state *state,
-                          const uint8_t *passed_mem_offset) {
-  uint8_t offset = 0;
-  if (passed_mem_offset)
-    offset = *passed_mem_offset;
-  if (!state)
-    return;
-  // Encoding for: sw x2, 0(x1)
-  // imm[11:5]=0, rs2=2, rs1=1, funct3=0x2, imm[4:0]=0, opcode=0x23 ->
-  // 0x0020A023
-  const uint32_t sw_x2_0_x1 = 0x0020A023u;
-  state->memory[0] = sw_x2_0_x1;
-  // Prepare registers: base in x1, value in x2
-  state->regs[REG_x1] = 0;           // base address 0
-  state->regs[REG_x2] = 0xDEADBEEFu; // value to store
-  state->pc = offset;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_lw_program(risc_v_state *state,
-                          const uint8_t *passed_mem_offset) {
-  uint8_t offset = 0;
-  if (passed_mem_offset)
-    offset = *passed_mem_offset;
-  if (!state)
-    return;
-  // Place a data word at memory[1] (byte addr 4)
-  state->memory[1] = 0xCAFEBABEu;
-
-  // Encoding for: lw x3, 4(x1)
-  // imm=4, rs1=1, funct3=0x2, rd=3, opcode=0x03 -> construct 32-bit
-  // (this is a much better way to encode instructions)
-  const uint32_t lw_x3_4_x1 =
-      (4u << 20) | (1u << 15) | (0x2u << 12) | (3u << 7) | (0x03u);
-  state->memory[0] = lw_x3_4_x1;
-  state->regs[REG_x1] = 0; // base
-  state->regs[REG_x3] = 0;
-  state->pc = offset;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_addi_program(risc_v_state *state,
-                            const uint8_t *passed_mem_offset) {
-  if (!state)
-    return;
-
-  uint32_t offset = 0;
-  if (passed_mem_offset)
-    offset = *passed_mem_offset;
-  // Encoding for: addi x3, x1, 10  -> imm[11:0]=0x00A, rs1=1, funct3=0, rd=3,
-  // opcode=0x13 instruction = 0x00A08193
-  const uint32_t addi_x3_x1_10 = 0x00A08193u;
-  state->memory[offset] = addi_x3_x1_10;
-  state->regs[REG_x1] = 5; // base value
-  state->pc = 0 + offset;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test_jalr_program(risc_v_state *state,
-                            const uint8_t *passed_mem_offset) {
-  uint8_t offset = 0;
-  if (passed_mem_offset)
-    offset = *passed_mem_offset;
-  if (!state)
-    return;
-
-  // Encoding for: jalr x3, 4(x0)
-  // imm=4, rs1=0, funct3=0, rd=3, opcode=0x67 ->
-  // (4<<20)|(0<<15)|(0<<12)|(3<<7)|0x67
-  const uint32_t jalr_imm_bytes =
-      12u; // immediate in bytes used in the jalr instruction
-  const uint32_t jalr_x3_4_x0 =
-      (jalr_imm_bytes << 20) | (0u << 15) | (0u << 12) | (3u << 7) | (0x67u);
-
-  // Encoding for: addi x4, x0, 42 -> (42<<20)|(0<<15)|(0<<12)|(4<<7)|0x13
-  const uint32_t addi_x4_x0_42 =
-      (42u << 20) | (0u << 15) | (0u << 12) | (4u << 7) | (0x13u);
-
-  state->memory[0 + offset] = jalr_x3_4_x0;
-  // place the target instruction at the correct word index derived from the
-  // byte immediate
-  uint32_t target_index = (jalr_imm_bytes / sizeof(uint32_t)) + offset;
-  state->memory[target_index] = addi_x4_x0_42; // should execute after jump
-
-  state->regs[REG_x0] = 0;
-  state->regs[REG_x3] = 0;
-  state->regs[REG_x4] = 0;
-  state->pc = 0 + offset;
-  state->is_valid = true;
-  state->is_running = true;
-}
-
-void load_test(risc_v_state *state) {
-  // we'd load all tests so so far...
-  uint8_t *mem_offset = malloc(sizeof(uint8_t));
-  *mem_offset = 0;
-  // load_test_sub_program(state, mem_offset);
-  // load_test_addi_program(state, NULL);
-  // run jalr test by default
-  load_test_jalr_program(state, NULL);
-}
-
+#ifndef EMU_NO_MAIN
 int main(void) {
   risc_v_state state;
   TRY_OR_EXIT(init_riscv_emu(&state), "Failed to initialize riscv state");
-  load_test(&state);
-  emulate(&state);
 
-  // verify jalr set return address (x3 == 4) and that the jumped-to instruction
-  // executed (x4 == 42)
-  assert(state.regs[REG_x3] == 4u);
-  assert(state.regs[REG_x4] == 42u);
-
+  // TODO: Load a program here or implement file loading
+  
   print_registers(&state);
-  print_memory(&state, 0x0, 12);
 
   return EXIT_SUCCESS;
 }
+#endif /* EMU_NO_MAIN */
