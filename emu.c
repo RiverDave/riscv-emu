@@ -1,10 +1,17 @@
 #include "emu.h"
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+
 
 /*
 I'm looking for a couple of things...
@@ -21,31 +28,42 @@ I'm looking for a couple of things...
            in out program
 */
 
-bool init_riscv_emu(risc_v_state *state) {
+bool init_riscv_emu(risc_v_state **state) {
+  *state = malloc(sizeof(risc_v_state));
 
-  if (!state)
+  if (!*state)
     return false;
-  for (int i = 0; i < REG_COUNT; ++i)
-    state->regs[i] = 0;
-  for (int i = 0; i < MEMORY_SIZE; ++i)
-    state->memory[i] = 0;
-  state->pc = 0;
+  for (uint32_t i = 0; i < REG_COUNT; ++i)
+    (*state)->regs[i] = 0;
+  (*state)->regs[REG_x2] = STACK_START_ADDR; // set sp
+  for (uint32_t i = 0; i < MEMORY_SIZE; ++i)
+    (*state)->memory[i] = 0;
+  (*state)->pc = 0;
   return true;
 }
 
 bool is_address_valid(const uint32_t addr) {
-  if (addr % sizeof(uint32_t) != 0)
+  // for simplicity purposes we're only supported aligned addresses.
+  if (addr % sizeof(uint32_t) != 0){
+    fprintf(stderr, "Address not divisible by word size\n");
     return false;
+  }
+
   uint32_t index = addr / sizeof(uint32_t);
   return index < MEMORY_SIZE;
 }
 
 bool decode_instruction(risc_v_state *state, const uint32_t instruction,
-                        Instruction *output) {
-  if (!state || !output)
+                        Instruction *result) {
+  if (!state || !result)
     return false;
 
   uint32_t opcode = ((instruction >> 0) & 0x7F);
+  #ifdef DEBUG
+  fprintf(stderr, "[DEBUG] decoded: instruction=0x%08x opcode=0x%02x pc=0x%x\n", 
+          instruction, opcode, state->pc);
+  #endif
+
   switch (opcode) {
   case R_FMT: {
 
@@ -64,9 +82,9 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     switch (funct3) {
     case 0x00: {
       if (!funct7)
-        output->name = ADD;
+        result->name = ADD;
       else
-        output->name = SUB;
+        result->name = SUB;
     } break;
 
     default:
@@ -74,9 +92,9 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     }
     assert((rd < REG_COUNT && rs1 < REG_COUNT && rs2 < REG_COUNT) &&
            "Invalid register val");
-    output->ops[0] = rd;
-    output->ops[1] = rs1;
-    output->ops[2] = rs2;
+    result->ops[0] = rd;
+    result->ops[1] = rs1;
+    result->ops[2] = rs2;
     return true; // success
   } break;
 
@@ -96,15 +114,15 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     switch (funct3) {
 
     case 0x00: { // addi
-      output->name = ADDI;
+      result->name = ADDI;
     } break;
     default:
       assert(false && "I-FMT instruction not implemented");
     }
 
-    output->ops[0] = rd;
-    output->ops[1] = rs1;
-    output->ops[2] = imm;
+    result->ops[0] = rd;
+    result->ops[1] = rs1;
+    result->ops[2] = imm;
     return true; // success
     assert((rd < REG_COUNT && rs1 < REG_COUNT) && "Invalid register val");
 
@@ -120,15 +138,15 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
 
     switch (funct3) {
     case 0x2: // lw
-      output->name = LW;
+      result->name = LW;
       break;
     default:
       return false;
     }
 
-    output->ops[0] = rd;
-    output->ops[1] = rs1;
-    output->ops[2] = imm;
+    result->ops[0] = rd;
+    result->ops[1] = rs1;
+    result->ops[2] = imm;
     return true;
   } break;
 
@@ -145,13 +163,13 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
 
     if (funct3 ==
         0x00) // might not be needed but just to make sure we get it right.
-      output->name = JALR;
+      result->name = JALR;
     else
       return false;
 
-    output->ops[0] = rd;
-    output->ops[1] = rs1;
-    output->ops[2] = imm;
+    result->ops[0] = rd;
+    result->ops[1] = rs1;
+    result->ops[2] = imm;
     return true;
   } break;
 
@@ -169,22 +187,22 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     switch (funct3) {
 
     case 0x2: { // sw
-      output->name = SW;
+      result->name = SW;
     } break;
     default:
       assert(false && "S-FMT instruction not implemented");
     }
 
     // ops: [rs1, rs2, imm]
-    output->ops[0] = rs1;
-    output->ops[1] = rs2;
-    output->ops[2] = imm_final;
+    result->ops[0] = rs1;
+    result->ops[1] = rs2;
+    result->ops[2] = imm_final;
 
     return true;
   } break;
   default: {
     if (!opcode)
-      return true; // temporarily, this should crash
+      return false; // temporarily, this should crash
                    // Will make it work after we figure out syscalls
   }
   }
@@ -203,7 +221,7 @@ void print_registers(const risc_v_state *state) {
   puts("-- Registers --");
   puts("Idx Name        Hex       Decimal");
   for (int i = 0; i < REG_COUNT; ++i) {
-    printf("%2d  %-12s 0x%08x %10u\n", i, reg_names[i], state->regs[i],
+    printf("%2d  %-12s 0x%08x %10d\n", i, reg_names[i], state->regs[i],
            state->regs[i]);
   }
 }
@@ -286,6 +304,7 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
 
     uint32_t addr = state->regs[rs1] + imm; // byte address
 
+
     // FIXME The quality of these errors might not be to good rn. will come back
     // later.
     TRY_OR_EXIT(is_address_valid(addr), "Invalid address for SW Instruction");
@@ -324,6 +343,13 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     // compute target from register value + imm, clear low bit per spec
     uint32_t jmp_addr = state->regs[rs1] + imm;
     jmp_addr &= ~1u;
+
+    // Treat jump to address 0 as program exit (return from main with ra=0)
+    if (jmp_addr == 0) {
+      state->is_running = false;
+      break;
+    }
+
     TRY_OR_EXIT(is_address_valid(jmp_addr),
                 "Invalid Jump Address for JALR instruction");
     uint32_t new_ret_addr = state->pc + 4;
@@ -360,14 +386,45 @@ bool emulate(risc_v_state *state) {
   return true;
 }
 
-#ifndef EMU_NO_MAIN
-int main(void) {
-  risc_v_state state;
-  TRY_OR_EXIT(init_riscv_emu(&state), "Failed to initialize riscv state");
+// Load flat binary into emulator memory (file is a sequence of bytes)
+bool load_binary(risc_v_state *state, const char *filename) {
+  if (state == NULL || !filename)
+    return false;
+ 
+  FILE *f = fopen(filename, "rb");
+  if (!f) return false;
+  size_t max_bytes = MEMORY_SIZE * sizeof(uint32_t);
+  // Read directly into state->memory; cast to uint8_t* for byte-level read
+  size_t bytes_read = fread((uint8_t*)state->memory, 1, max_bytes, f);
+  if (ferror(f)) {
+    fclose(f);
+    return false;
+  }
+  int extra = fgetc(f);
+  if (extra != EOF) {
+    // There is more data than the memory can hold
+    fprintf(stderr, "Warning: binary truncated to %zu bytes\n", max_bytes);
+  }
+  fclose(f);
+  if (bytes_read == 0) return false;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+  return true;
+}
 
-  // TODO: Load a program here or implement file loading
-  
-  print_registers(&state);
+#ifndef EMU_NO_MAIN
+int main(int argc, char* argv[]) {
+  risc_v_state* state = NULL;
+  TRY_OR_EXIT(init_riscv_emu(&state), "Failed to initialize riscv state");
+  assert(state != NULL);
+  if(argc > 1 )
+    TRY_OR_EXIT(load_binary(state, argv[1]), "Failed to load binary");
+  emulate(state);
+  print_registers(state);
+  print_memory(state, 0, 16);
+
+  free(state); // cleanup
 
   return EXIT_SUCCESS;
 }

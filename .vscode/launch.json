@@ -34,6 +34,17 @@
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false,
             "preLaunchTask": "build emu"
+        },
+
+        {
+            "name": "Debug emu (With Program) (CodeLLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/emu",
+            "args": ["${workspaceFolder}/simple.bin"],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "preLaunchTask": "build emu"
         }
     ]
 }

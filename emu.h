@@ -14,8 +14,8 @@
  * Constants
  * ───────────────────────────────────────────────────────────────────────────── */
 
-#define MEMORY_SIZE 4096
-#define RISCV32I_STEP_COUNT 4
+#define MEMORY_SIZE 0x00400000
+#define STACK_START_ADDR 0x00300000 
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Register X-macro: name and printable string
@@ -121,7 +121,7 @@ typedef struct {
  * Function declarations
  * ───────────────────────────────────────────────────────────────────────────── */
 
-bool init_riscv_emu(risc_v_state *state);
+bool init_riscv_emu(risc_v_state **state);
 bool is_address_valid(uint32_t addr);
 bool decode_instruction(risc_v_state *state, uint32_t instruction,
                         Instruction *output);
