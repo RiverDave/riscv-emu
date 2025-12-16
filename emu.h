@@ -14,8 +14,8 @@
  * Constants
  * ───────────────────────────────────────────────────────────────────────────── */
 
-#define MEMORY_SIZE 0x00400000
-#define STACK_START_ADDR 0x00300000 
+#define MEMORY_SIZE 0x00500000      // 20 MB (in 32-bit words)
+#define STACK_START_ADDR 0x00400000 
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Register X-macro: name and printable string
@@ -98,6 +98,14 @@ typedef enum {
   SW,
   LW,
   JALR,
+  XOR,
+  OR,
+  AND,
+  SLL,
+  SRL,
+  SRA,
+  SLT,
+  SLTU,
 } Opcode;
 
 // source:

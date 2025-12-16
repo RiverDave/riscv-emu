@@ -45,6 +45,16 @@
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false,
             "preLaunchTask": "build emu"
+        },
+        {
+            "name": "Debug tests (CodeLLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "preLaunchTask": "build tests"
         }
     ]
 }

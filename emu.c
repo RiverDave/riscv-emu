@@ -1,17 +1,15 @@
 #include "emu.h"
 
 #include <assert.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
-
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 /*
 I'm looking for a couple of things...
@@ -59,10 +57,10 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     return false;
 
   uint32_t opcode = ((instruction >> 0) & 0x7F);
-  #ifdef DEBUG
-  fprintf(stderr, "[DEBUG] decoded: instruction=0x%08x opcode=0x%02x pc=0x%x\n", 
+#ifdef DEBUG
+  fprintf(stderr, "[DEBUG] decoded: instruction=0x%08x opcode=0x%02x pc=0x%x\n",
           instruction, opcode, state->pc);
-  #endif
+#endif
 
   switch (opcode) {
   case R_FMT: {
@@ -86,6 +84,32 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
       else
         result->name = SUB;
     } break;
+    case 0x04:
+      result->name = XOR;
+      break;
+    case 0x6:
+      result->name = OR;
+      break;
+    case 0x7:
+      result->name = AND;
+      break;
+    case 0x1:
+      result->name = SLL;
+      break;
+    case 0x5: {
+      if (!funct7) // 0x00
+        result->name = SRL;
+      else
+        result->name = SRA;
+    } break;
+
+    case 0x02:
+      result->name = SLT;
+      break;
+
+    case 0x03:
+      result->name = SLTU;
+      break;
 
     default:
       return false;
@@ -357,6 +381,93 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
       state->regs[rd] = new_ret_addr;
     state->pc = jmp_addr;
   } break;
+
+  // FIXME: This needs to be widely refactored, as we can see the repetition is
+  // a bunch
+  //
+  case XOR: {
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
+
+    if (rd != REG_x0) // register x0 is read only
+      state->regs[rd] = state->regs[rs1] ^ state->regs[rs2];
+    state->pc += 4;
+    break;
+  }
+
+  case OR: {
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
+
+    if (rd != REG_x0) // register x0 is read only
+      state->regs[rd] = state->regs[rs1] | state->regs[rs2];
+    state->pc += 4;
+    break;
+  }
+
+  case AND: {
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
+
+    if (rd != REG_x0) // register x0 is read only
+      state->regs[rd] = state->regs[rs1] & state->regs[rs2];
+    state->pc += 4;
+    break;
+  }
+
+  case SLL: {
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
+
+    if (rd != REG_x0) // register x0 is read only
+      state->regs[rd] = state->regs[rs1] << state->regs[rs2];
+    state->pc += 4;
+    break;
+  }
+
+  case SRL: {
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
+
+    if (rd != REG_x0) // register x0 is read only
+      state->regs[rd] = state->regs[rs1] >> state->regs[rs2];
+    state->pc += 4;
+    break;
+  }
+
+  case SRA: {
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
+
+    if (rd != REG_x0) // register x0 is read only
+      state->regs[rd] = (uint32_t)((int32_t)state->regs[rs1] >>
+                                   state->regs[rs2]); // sign-extend
+    state->pc += 4;
+    break;
+  }
+
+  case SLTU:
+  case SLT: {
+    uint32_t rd = insn->ops[0];
+    uint32_t rs1 = insn->ops[1];
+    uint32_t rs2 = insn->ops[2];
+
+    if (rd != REG_x0) {
+      if (insn->name == SLT)
+        state->regs[rd] = ((int32_t)rs1 < (int32_t)rs2) ? 1 : 0;
+      else // handle sltu (No need to cast ops since both are unsigned already)
+        state->regs[rd] = (rs1 < rs2) ? 1 : 0;
+    }
+
+    state->pc += 4;
+    break;
+  }
 
   default:
     assert(false && "NYI");

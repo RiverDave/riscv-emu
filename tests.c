@@ -65,7 +65,12 @@ void load_test_xor_program(risc_v_state *state) {
 void load_test_or_program(risc_v_state *state) {
   if (!state) return;
   reset_state(state);
+
   // Encoding for: or x3, x1, x2  -> 0x0020E1B3
+  // 0000000(f7)|00010(r2)|00001(rs1)|110(f3)|00011(rd)|0110011(op)
+  // 0000 0000 0010 0000 1110 0001 1011 0011
+  // 0020E1B3
+
   const uint32_t or_x3_x1_x2 = 0x0020E1B3u;
   state->memory[0] = or_x3_x1_x2;
   state->regs[REG_x1] = 10;
@@ -248,19 +253,18 @@ typedef struct {
   uint32_t expected_x3;
 } test_case_t;
 
-// TODO: Add the rest of the current encoded tests...
 static test_case_t tests[] = {
     {"ADD  x3, x1, x2", load_test_add_program, 12},
     {"SUB  x3, x1, x2", load_test_sub_program, 7},
     {"JALR  x3, 12(x0)", load_test_jalr_program, 42},
-    // {"XOR  x3, x1, x2", load_test_xor_program, 6},
-    // {"OR   x3, x1, x2", load_test_or_program, 14},
-    // {"AND  x3, x1, x2", load_test_and_program, 8},
-    // {"SLL  x3, x1, x2", load_test_sll_program, 6},
-    // {"SRL  x3, x1, x2", load_test_srl_program, 4},
-    // {"SRA  x3, x1, x2", load_test_sra_program, 0xFFFFFFFCu},
-    // {"SLT  x3, x1, x2", load_test_slt_program, 1},
-    // {"SLTU x3, x1, x2", load_test_sltu_program, 1},
+    {"XOR  x3, x1, x2", load_test_xor_program, 6},
+    {"OR   x3, x1, x2", load_test_or_program, 14},
+    {"AND  x3, x1, x2", load_test_and_program, 8},
+    {"SLL  x3, x1, x2", load_test_sll_program, 6},
+    {"SRL  x3, x1, x2", load_test_srl_program, 4},
+    {"SRA  x3, x1, x2", load_test_sra_program, 0xFFFFFFFCu},
+    {"SLT  x3, x1, x2", load_test_slt_program, 1},
+    {"SLTU x3, x1, x2", load_test_sltu_program, 1},
 };
 
 #define NUM_TESTS (sizeof(tests) / sizeof(tests[0]))
@@ -271,17 +275,23 @@ static test_case_t tests[] = {
 int main(void) {
   int passed = 0, failed = 0;
 
-  for (size_t i = 0; i < NUM_TESTS; ++i) {
-    risc_v_state state;
-    tests[i].loader(&state);
+  // Allocate on heap - risc_v_state is too large for stack (~8GB)
+  risc_v_state *state = malloc(sizeof(risc_v_state));
+  if (!state) {
+    fprintf(stderr, "Failed to allocate state\n");
+    return EXIT_FAILURE;
+  }
 
-    if (!emulate(&state)) {
+  for (size_t i = 0; i < NUM_TESTS; ++i) {
+    tests[i].loader(state);
+
+    if (!emulate(state)) {
       printf("[FAIL] %s — emulation error\n", tests[i].name);
       ++failed;
       continue;
     }
 
-    uint32_t got = state.regs[REG_x3];
+    uint32_t got = state->regs[REG_x3];
     if (got == tests[i].expected_x3) {
       printf("[PASS] %s → x3 = 0x%08X\n", tests[i].name, got);
       ++passed;
@@ -292,6 +302,7 @@ int main(void) {
     }
   }
 
+  free(state);
   printf("\n=== Results: %d passed, %d failed ===\n", passed, failed);
   return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

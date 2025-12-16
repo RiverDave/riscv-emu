@@ -1,6 +1,7 @@
 CC := cc
 CFLAGS := -std=c11 -Wall -Wextra
-DEBUG_CFLAGS := -g -O0 -DDEBUG
+DEBUG_CFLAGS := -g -O0
+DEBUG_VERBOSE := -DDEBUG
 RELEASE_CFLAGS := -O2
 
 SRCS := emu.c

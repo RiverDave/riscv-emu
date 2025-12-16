@@ -9,6 +9,15 @@
       "group": { "kind": "build", "isDefault": true },
       "presentation": { "reveal": "always", "panel": "shared" },
       "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "build tests",
+      "type": "shell",
+      "command": "make build/tests",
+      "args": [],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": ["$gcc"]
     }
   ]
 }
