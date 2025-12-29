@@ -11,20 +11,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-/*
-I'm looking for a couple of things...
-
-    - I wanna exprese the number of registers in my emulator
-    something like uint32_t reg[32]
-    - document all of the opcodes I'll need to take into consideration
-    - keep strack of a stack of a specific size  (not using it for now)
-
-    - keep track of a program counter
-        - The pc will hold the instruction to fetch
-    - Memory -> uint8_t memory[MEMORY SIZE]
-        - The memory will hold all of the series of instructions
-           in out program
-*/
+// Sign-extend 12-bit immediate to 32-bit
+#define SEXT12(x) ((x) & 0x800 ? (x) | 0xFFFFF000 : (x))
 
 bool init_riscv_emu(risc_v_state **state) {
   *state = malloc(sizeof(risc_v_state));
@@ -61,6 +49,11 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
   fprintf(stderr, "[DEBUG] decoded: instruction=0x%08x opcode=0x%02x pc=0x%x\n",
           instruction, opcode, state->pc);
 #endif
+
+// I-type format bit extraction macro
+#define I_DECODE(i) \
+  uint32_t rd = ((i) >> 7) & 0x1F, funct3 = ((i) >> 12) & 0x7, \
+           rs1 = ((i) >> 15) & 0x1F, imm = ((i) >> 20) & 0xFFF
 
   switch (opcode) {
   case R_FMT: {
@@ -123,17 +116,7 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
   } break;
 
   case I_FMT: {
-
-    // 0x7F -> 0111 1111 | mask for (opcode) [6:0] bits
-    // 0x1F -> 0001 1111 | mask for (rd) [11:7] bits
-    // 0x7 -> 0000 0111 | mask for (funct3) [14:12] bits
-    // 0x1F -> 0001 1111 | mask for (rs1) [19:15] bits
-    // ((instruction >> initial_bit_position) & (bit_width) ) = ((instruction >>
-    // 20) && 0xFFF)
-    uint32_t rd = ((instruction >> 7) & 0x1F);
-    uint32_t funct3 = ((instruction >> 12) & 0x7);
-    uint32_t rs1 = ((instruction >> 15) & 0x1F);
-    uint32_t imm = (instruction >> 20 & 0xFFF);
+    I_DECODE(instruction);
 
     switch (funct3) {
 
@@ -153,12 +136,7 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
   } break;
 
   case LOAD_FMT: {
-    // this format has the same composition as I fmt
-    // I-type loads (opcode 0x03)
-    uint32_t rd = ((instruction >> 7) & 0x1F);
-    uint32_t funct3 = ((instruction >> 12) & 0x7);
-    uint32_t rs1 = ((instruction >> 15) & 0x1F);
-    uint32_t imm = (instruction >> 20) & 0xFFF;
+    I_DECODE(instruction);
 
     switch (funct3) {
     case 0x2: // lw
@@ -174,16 +152,9 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     return true;
   } break;
 
-  // FIXME: As it is similar to other formats, jmp instructions share the same
-  // format as I fmt, perhaps we can avoid the duplication in the bit extraction
-  // mechanism we utilize below.
   case I_JMP_FMT: { // used mainly for jalr, Not to confuse with jal which has
                     // its own opcode.
-
-    uint32_t rd = ((instruction >> 7) & 0x1F);
-    uint32_t funct3 = ((instruction >> 12) & 0x7);
-    uint32_t rs1 = ((instruction >> 15) & 0x1F);
-    uint32_t imm = (instruction >> 20 & 0xFFF);
+    I_DECODE(instruction);
 
     if (funct3 ==
         0x00) // might not be needed but just to make sure we get it right.
@@ -231,6 +202,7 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
   }
   }
   return false;
+#undef I_DECODE
 }
 
 static const char *reg_names[REG_COUNT] = {
@@ -282,33 +254,21 @@ bool is_riscv_state_valid(const risc_v_state *state) {
 void execute_instruction(risc_v_state *state, const Instruction *insn) {
   if (!state || !insn)
     return;
+
+// R-format instruction execution macro
+#define R_OP(name, op) \
+  case name: { \
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], rs2 = insn->ops[2]; \
+    if (rd != REG_x0) state->regs[rd] = state->regs[rs1] op state->regs[rs2]; \
+    state->pc += 4; break; }
+
   switch (insn->name) {
-  case ADD: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-    if (rd != REG_x0) // register x0 is read only
-      state->regs[rd] = state->regs[rs1] + state->regs[rs2];
-    state->pc += 4;
-    break;
-  }
-  case SUB: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-    if (rd != REG_x0)
-      state->regs[rd] = state->regs[rs1] - state->regs[rs2];
-    state->pc += 4;
-    break;
-  }
+  R_OP(ADD, +)
+  R_OP(SUB, -)
   case ADDI: {
     uint32_t rd = insn->ops[0];
     uint32_t rs1 = insn->ops[1];
-    int32_t imm = insn->ops[2];
-
-    // preserve signedneness on immediate
-    if (imm & 0x800)     // check if the signed bit is set.
-      imm |= 0xFFFFF000; // fill upper bits with 1's
+    int32_t imm = SEXT12(insn->ops[2]);
 
     if (rd != REG_x0)
       state->regs[rd] = state->regs[rs1] + imm;
@@ -320,11 +280,7 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     // Store word: compute effective address and write rs2 value into memory
     uint32_t rs1 = insn->ops[0]; // base register
     uint32_t rs2 = insn->ops[1]; // source register (value to store)
-    int32_t imm = insn->ops[2];
-
-    // sign-extend 12-bit immediate
-    if (imm & 0x800)
-      imm |= 0xFFFFF000;
+    int32_t imm = SEXT12(insn->ops[2]);
 
     uint32_t addr = state->regs[rs1] + imm; // byte address
 
@@ -342,11 +298,7 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
 
     uint32_t rd = insn->ops[0];
     uint32_t rs1 = insn->ops[1];
-    int32_t imm = insn->ops[2];
-
-    // sign-extend 12-bit immediate
-    if (imm & 0x800)
-      imm |= 0xFFFFF000;
+    int32_t imm = SEXT12(insn->ops[2]);
 
     uint32_t addr = state->regs[rs1] + imm; // byte address
     TRY_OR_EXIT(is_address_valid(addr), "Invalid address for LW Instruction");
@@ -358,11 +310,7 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
   case JALR: {
     uint32_t rd = insn->ops[0];
     uint32_t rs1 = insn->ops[1];
-    int32_t imm = insn->ops[2];
-
-    // preserve signedneness on immediate
-    if (imm & 0x800)
-      imm |= 0xFFFFF000;
+    int32_t imm = SEXT12(insn->ops[2]);
 
     // compute target from register value + imm, clear low bit per spec
     uint32_t jmp_addr = state->regs[rs1] + imm;
@@ -382,89 +330,27 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     state->pc = jmp_addr;
   } break;
 
-  // FIXME: This needs to be widely refactored, as we can see the repetition is
-  // a bunch
-  //
-  case XOR: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-
-    if (rd != REG_x0) // register x0 is read only
-      state->regs[rd] = state->regs[rs1] ^ state->regs[rs2];
-    state->pc += 4;
-    break;
-  }
-
-  case OR: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-
-    if (rd != REG_x0) // register x0 is read only
-      state->regs[rd] = state->regs[rs1] | state->regs[rs2];
-    state->pc += 4;
-    break;
-  }
-
-  case AND: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-
-    if (rd != REG_x0) // register x0 is read only
-      state->regs[rd] = state->regs[rs1] & state->regs[rs2];
-    state->pc += 4;
-    break;
-  }
-
-  case SLL: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-
-    if (rd != REG_x0) // register x0 is read only
-      state->regs[rd] = state->regs[rs1] << state->regs[rs2];
-    state->pc += 4;
-    break;
-  }
-
-  case SRL: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-
-    if (rd != REG_x0) // register x0 is read only
-      state->regs[rd] = state->regs[rs1] >> state->regs[rs2];
-    state->pc += 4;
-    break;
-  }
+  R_OP(XOR, ^)
+  R_OP(OR,  |)
+  R_OP(AND, &)
+  R_OP(SLL, <<)
+  R_OP(SRL, >>)
 
   case SRA: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-
-    if (rd != REG_x0) // register x0 is read only
-      state->regs[rd] = (uint32_t)((int32_t)state->regs[rs1] >>
-                                   state->regs[rs2]); // sign-extend
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], rs2 = insn->ops[2];
+    if (rd != REG_x0)
+      state->regs[rd] = (uint32_t)((int32_t)state->regs[rs1] >> state->regs[rs2]);
     state->pc += 4;
     break;
   }
 
   case SLTU:
   case SLT: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    uint32_t rs2 = insn->ops[2];
-
-    if (rd != REG_x0) {
-      if (insn->name == SLT)
-        state->regs[rd] = ((int32_t)rs1 < (int32_t)rs2) ? 1 : 0;
-      else // handle sltu (No need to cast ops since both are unsigned already)
-        state->regs[rd] = (rs1 < rs2) ? 1 : 0;
-    }
-
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], rs2 = insn->ops[2];
+    if (rd != REG_x0)
+      state->regs[rd] = (insn->name == SLT)
+        ? ((int32_t)state->regs[rs1] < (int32_t)state->regs[rs2])
+        : (state->regs[rs1] < state->regs[rs2]);
     state->pc += 4;
     break;
   }
@@ -473,6 +359,7 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     assert(false && "NYI");
     break;
   }
+#undef R_OP
 }
 
 // consider instructions are loaded into memory (risc_v_state).
