@@ -94,9 +94,20 @@ typedef struct {
 typedef enum {
   ADD,
   SUB,
+  // ==== I FMT instructions =======
   ADDI,
+  XORI,
+  ORI,
+  ANDI,
+  SLLI,
+  SRLI,
+  SRAI,
+  SLTI,
+  SLTIU,
+
   SW,
   LW,
+  // ================================
   JALR,
   XOR,
   OR,

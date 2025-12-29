@@ -117,12 +117,45 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
 
   case I_FMT: {
     I_DECODE(instruction);
-
+    // FIXME: Tons of lines here perhaps we can reftor it nicer - with some macro magic
     switch (funct3) {
-
-    case 0x00: { // addi
+    case 0x00:
       result->name = ADDI;
-    } break;
+     break;
+
+    case 0x4:
+      result->name = XORI;
+    break;
+
+    case 0x6:
+      result->name = ORI;
+    break;
+
+    case 0x7:
+      result->name = ANDI;
+    break;
+
+    case 0x1:
+      result->name = SLLI;
+    break;
+
+    case 0x5: {
+      // TODO: This nit line might be duplicate in the execution, will refactor later.
+      uint32_t id = ((imm) >> 5) & 0x7F;
+      if(id)
+            result->name = SRAI;
+      else
+            result->name = SRLI;
+    }break;
+
+    case 0x2:
+      result->name = SLTI;
+    break;
+
+    case 0x3:
+      result->name = SLTIU;
+    break;
+
     default:
       assert(false && "I-FMT instruction not implemented");
     }
@@ -262,17 +295,41 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     if (rd != REG_x0) state->regs[rd] = state->regs[rs1] op state->regs[rs2]; \
     state->pc += 4; break; }
 
-  switch (insn->name) {
-  R_OP(ADD, +)
-  R_OP(SUB, -)
-  case ADDI: {
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    int32_t imm = SEXT12(insn->ops[2]);
+#define I_OP(name, op) \
+  case name: { \
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = SEXT12(insn->ops[2]); \
+    if (rd != REG_x0) state->regs[rd] = state->regs[rs1] op imm; \
+    state->pc += 4; break; }
 
-    if (rd != REG_x0)
-      state->regs[rd] = state->regs[rs1] + imm;
+  switch (insn->name) {
+
+  // == I FMT exec
+  I_OP(ADDI, +)
+  I_OP(XORI, ^)
+  I_OP(ORI, |)
+  I_OP(ANDI, &)
+  I_OP(SLLI, <<)
+
+  case SRLI:
+  case SRAI:{
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = insn->ops[2];
+    uint32_t id = ((imm) >> 5) & 0x7F;
+    uint32_t shamt = imm & 0x1F;
+
+    if(rd != REG_x0)
+        state->regs[rd] = id ? (uint32_t)((int32_t)state->regs[rs1] >> shamt) :
+            state->regs[rs1] >> shamt;
     state->pc += 4;
+  } break;
+
+  case SLTI:
+  case SLTIU: {
+      uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = SEXT12(insn->ops[2]);
+      if (rd != REG_x0)
+        state->regs[rd] = (insn->name == SLT)
+          ? ((int32_t)state->regs[rs1] < (int32_t)imm)
+          : (state->regs[rs1] < imm);
+      state->pc += 4;
   } break;
 
   case SW: {
@@ -330,6 +387,10 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     state->pc = jmp_addr;
   } break;
 
+  // == I FMT exec
+
+  R_OP(ADD, +)
+  R_OP(SUB, -)
   R_OP(XOR, ^)
   R_OP(OR,  |)
   R_OP(AND, &)
@@ -388,7 +449,7 @@ bool emulate(risc_v_state *state) {
 bool load_binary(risc_v_state *state, const char *filename) {
   if (state == NULL || !filename)
     return false;
- 
+
   FILE *f = fopen(filename, "rb");
   if (!f) return false;
   size_t max_bytes = MEMORY_SIZE * sizeof(uint32_t);

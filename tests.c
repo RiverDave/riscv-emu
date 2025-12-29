@@ -243,6 +243,126 @@ void load_test_jalr_program(risc_v_state *state) {
   state->is_running = true;
 }
 
+// SLTI: x3 = (x1 < 10) ? 1 : 0 (signed)   (5 < 10 → 1)
+void load_test_slti_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Encoding for: slti x3, x1, 10
+  // imm=10, rs1=1, funct3=0x2, rd=3, opcode=0x13
+  const uint32_t slti_x3_x1_10 =
+      (10u << 20) | (1u << 15) | (0x2u << 12) | (3u << 7) | (0x13u);
+  state->memory[0] = slti_x3_x1_10;
+  state->regs[REG_x1] = 5;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SLTIU: x3 = (x1 < 10) ? 1 : 0 (unsigned)   (5 < 10 → 1)
+void load_test_sltiu_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Encoding for: sltiu x3, x1, 10
+  // imm=10, rs1=1, funct3=0x3, rd=3, opcode=0x13
+  const uint32_t sltiu_x3_x1_10 =
+      (10u << 20) | (1u << 15) | (0x3u << 12) | (3u << 7) | (0x13u);
+  state->memory[0] = sltiu_x3_x1_10;
+  state->regs[REG_x1] = 5;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// XORI: x3 = x1 ^ 0xFF   (0xAA ^ 0xFF = 0x55)
+void load_test_xori_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Encoding for: xori x3, x1, 0xFF
+  // imm=0xFF, rs1=1, funct3=0x4, rd=3, opcode=0x13
+  const uint32_t xori_x3_x1_0xFF =
+      (0xFFu << 20) | (1u << 15) | (0x4u << 12) | (3u << 7) | (0x13u);
+  state->memory[0] = xori_x3_x1_0xFF;
+  state->regs[REG_x1] = 0xAA;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// ORI: x3 = x1 | 0x0F   (0xF0 | 0x0F = 0xFF)
+void load_test_ori_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Encoding for: ori x3, x1, 0x0F
+  // imm=0x0F, rs1=1, funct3=0x6, rd=3, opcode=0x13
+  const uint32_t ori_x3_x1_0x0F =
+      (0x0Fu << 20) | (1u << 15) | (0x6u << 12) | (3u << 7) | (0x13u);
+  state->memory[0] = ori_x3_x1_0x0F;
+  state->regs[REG_x1] = 0xF0;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// ANDI: x3 = x1 & 0x0F   (0xFF & 0x0F = 0x0F)
+void load_test_andi_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Encoding for: andi x3, x1, 0x0F
+  // imm=0x0F, rs1=1, funct3=0x7, rd=3, opcode=0x13
+  const uint32_t andi_x3_x1_0x0F =
+      (0x0Fu << 20) | (1u << 15) | (0x7u << 12) | (3u << 7) | (0x13u);
+  state->memory[0] = andi_x3_x1_0x0F;
+  state->regs[REG_x1] = 0xFF;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SLLI: x3 = x1 << 2   (8 << 2 = 32)
+void load_test_slli_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Encoding for: slli x3, x1, 2
+  // imm[11:5]=0, shamt[4:0]=2, rs1=1, funct3=0x1, rd=3, opcode=0x13
+  const uint32_t slli_x3_x1_2 =
+      (2u << 20) | (1u << 15) | (0x1u << 12) | (3u << 7) | (0x13u);
+  state->memory[0] = slli_x3_x1_2;
+  state->regs[REG_x1] = 8;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SRLI: x3 = x1 >> 2 (logical)   (32 >> 2 = 8)
+void load_test_srli_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Encoding for: srli x3, x1, 2
+  // imm[11:5]=0, shamt[4:0]=2, rs1=1, funct3=0x5, rd=3, opcode=0x13
+  const uint32_t srli_x3_x1_2 =
+      (2u << 20) | (1u << 15) | (0x5u << 12) | (3u << 7) | (0x13u);
+  state->memory[0] = srli_x3_x1_2;
+  state->regs[REG_x1] = 32;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SRAI: x3 = x1 >> 2 (arithmetic)   (-8 >> 2 = -2 = 0xFFFFFFFE)
+void load_test_srai_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Encoding for: srai x3, x1, 2
+  // imm[11:5]=0x20 (bit 30 set), shamt[4:0]=2, rs1=1, funct3=0x5, rd=3, opcode=0x13
+  const uint32_t srai_x3_x1_2 =
+      (0x20u << 25) | (2u << 20) | (1u << 15) | (0x5u << 12) | (3u << 7) | (0x13u);
+  state->memory[0] = srai_x3_x1_2;
+  state->regs[REG_x1] = 0xFFFFFFF8u; // -8 in two's complement
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * Test runner infrastructure
  * ───────────────────────────────────────────────────────────────────────────── */
@@ -254,9 +374,9 @@ typedef struct {
 } test_case_t;
 
 static test_case_t tests[] = {
+    // R-format instructions
     {"ADD  x3, x1, x2", load_test_add_program, 12},
     {"SUB  x3, x1, x2", load_test_sub_program, 7},
-    {"JALR  x3, 12(x0)", load_test_jalr_program, 42},
     {"XOR  x3, x1, x2", load_test_xor_program, 6},
     {"OR   x3, x1, x2", load_test_or_program, 14},
     {"AND  x3, x1, x2", load_test_and_program, 8},
@@ -265,7 +385,22 @@ static test_case_t tests[] = {
     {"SRA  x3, x1, x2", load_test_sra_program, 0xFFFFFFFCu},
     {"SLT  x3, x1, x2", load_test_slt_program, 1},
     {"SLTU x3, x1, x2", load_test_sltu_program, 1},
+
+    // I-format instructions (arithmetic/logic)
+    {"ADDI  x3, x1, 10", load_test_addi_program, 15},
+    {"XORI  x3, x1, 0xFF", load_test_xori_program, 0x55},
+    {"ORI   x3, x1, 0x0F", load_test_ori_program, 0xFF},
+    {"ANDI  x3, x1, 0x0F", load_test_andi_program, 0x0F},
+    {"SLLI  x3, x1, 2", load_test_slli_program, 32},
+    {"SLTI  x3, x1, 10", load_test_slti_program, 1},
+    {"SLTIU x3, x1, 10", load_test_sltiu_program, 1},
+    {"SRLI  x3, x1, 2", load_test_srli_program, 8},
+    {"SRAI  x3, x1, 2", load_test_srai_program, 0xFFFFFFFEu},
+
+    // Others TBD
     {"LW    x3, 4(x1)", load_test_lw_program, 0xCAFEBABEu},
+    {"JALR  x3, 12(x0)", load_test_jalr_program, 42},
+
 };
 
 #define NUM_TESTS (sizeof(tests) / sizeof(tests[0]))
