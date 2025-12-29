@@ -186,12 +186,12 @@ void load_test_lw_program(risc_v_state *state) {
   if (!state) return;
   reset_state(state);
   // Place a data word at memory[1] (byte addr 4)
-  state->memory[1] = 0xCAFEBABEu;
+  state->memory[2] = 0xCAFEBABEu;
 
   // Encoding for: lw x3, 4(x1)
   // imm=4, rs1=1, funct3=0x2, rd=3, opcode=0x03 -> construct 32-bit
   const uint32_t lw_x3_4_x1 =
-      (4u << 20) | (1u << 15) | (0x2u << 12) | (3u << 7) | (0x03u);
+      (8u << 20) | (1u << 15) | (0x2u << 12) | (3u << 7) | (0x03u);
   state->memory[0] = lw_x3_4_x1;
   state->regs[REG_x1] = 0; // base
   state->regs[REG_x3] = 0;
@@ -265,6 +265,7 @@ static test_case_t tests[] = {
     {"SRA  x3, x1, x2", load_test_sra_program, 0xFFFFFFFCu},
     {"SLT  x3, x1, x2", load_test_slt_program, 1},
     {"SLTU x3, x1, x2", load_test_sltu_program, 1},
+    {"LW    x3, 4(x1)", load_test_lw_program, 0xCAFEBABEu},
 };
 
 #define NUM_TESTS (sizeof(tests) / sizeof(tests[0]))
