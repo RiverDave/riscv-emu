@@ -10,18 +10,21 @@
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Helper: reset state
- * ───────────────────────────────────────────────────────────────────────────── */
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 static void reset_state(risc_v_state *state) {
   memset(state, 0, sizeof(*state));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Test loader functions
- * ───────────────────────────────────────────────────────────────────────────── */
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 
 // ADD: x3 = x1 + x2   (5 + 7 = 12)
 void load_test_add_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: add x3, x1, x2  -> 0x002081B3
   const uint32_t add_x3_x1_x2 = 0x002081B3u;
@@ -35,7 +38,8 @@ void load_test_add_program(risc_v_state *state) {
 
 // SUB: x3 = x1 - x2   (10 - 3 = 7)
 void load_test_sub_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: sub x3, x1, x2  -> 0x402081B3
   const uint32_t sub_x3_x1_x2 = 0x402081B3u;
@@ -49,7 +53,8 @@ void load_test_sub_program(risc_v_state *state) {
 
 // XOR: x3 = x1 ^ x2   (0b1010 ^ 0b1100 = 0b0110 = 6)
 void load_test_xor_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: xor x3, x1, x2  -> 0x0020C1B3
   const uint32_t xor_x3_x1_x2 = 0x0020C1B3u;
@@ -63,7 +68,8 @@ void load_test_xor_program(risc_v_state *state) {
 
 // OR: x3 = x1 | x2   (0b1010 | 0b1100 = 0b1110 = 14)
 void load_test_or_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
 
   // Encoding for: or x3, x1, x2  -> 0x0020E1B3
@@ -82,7 +88,8 @@ void load_test_or_program(risc_v_state *state) {
 
 // AND: x3 = x1 & x2   (0b1010 & 0b1100 = 0b1000 = 8)
 void load_test_and_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: and x3, x1, x2  -> 0x0020F1B3
   const uint32_t and_x3_x1_x2 = 0x0020F1B3u;
@@ -96,7 +103,8 @@ void load_test_and_program(risc_v_state *state) {
 
 // SLL: x3 = x1 << x2   (3 << 1 = 6)
 void load_test_sll_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: sll x3, x1, x2  -> 0x002091B3
   const uint32_t sll_x3_x1_x2 = 0x002091B3u;
@@ -110,7 +118,8 @@ void load_test_sll_program(risc_v_state *state) {
 
 // SRL: x3 = x1 >> x2 (logical)   (8 >> 1 = 4)
 void load_test_srl_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: srl x3, x1, x2  -> 0x0020D1B3
   const uint32_t srl_x3_x1_x2 = 0x0020D1B3u;
@@ -124,7 +133,8 @@ void load_test_srl_program(risc_v_state *state) {
 
 // SRA: x3 = x1 >> x2 (arithmetic)   (-8 >> 1 = -4 = 0xFFFFFFFC)
 void load_test_sra_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: sra x3, x1, x2  -> 0x4020D1B3
   const uint32_t sra_x3_x1_x2 = 0x4020D1B3u;
@@ -138,7 +148,8 @@ void load_test_sra_program(risc_v_state *state) {
 
 // SLT: x3 = (x1 < x2) ? 1 : 0 (signed)   (-1 < 1 → 1)
 void load_test_slt_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: slt x3, x1, x2  -> 0x0020A1B3
   const uint32_t slt_x3_x1_x2 = 0x0020A1B3u;
@@ -152,7 +163,8 @@ void load_test_slt_program(risc_v_state *state) {
 
 // SLTU: x3 = (x1 < x2) ? 1 : 0 (unsigned)   (1 < 2 → 1)
 void load_test_sltu_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: sltu x3, x1, x2  -> 0x0020B1B3
   const uint32_t sltu_x3_x1_x2 = 0x0020B1B3u;
@@ -166,7 +178,8 @@ void load_test_sltu_program(risc_v_state *state) {
 
 // SW: store word - sw x2, 0(x1)
 void load_test_sw_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: sw x2, 0(x1)
   // imm[11:5]=0, rs2=2, rs1=1, funct3=0x2, imm[4:0]=0, opcode=0x23 ->
@@ -183,7 +196,8 @@ void load_test_sw_program(risc_v_state *state) {
 
 // LW: load word - lw x3, 4(x1)
 void load_test_lw_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Place a data word at memory[2] (byte addr 8)
   state->memory[2] = 0xCAFEBABEu;
@@ -202,7 +216,8 @@ void load_test_lw_program(risc_v_state *state) {
 
 // ADDI: x3 = x1 + 10   (5 + 10 = 15)
 void load_test_addi_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: addi x3, x1, 10  -> imm[11:0]=0x00A, rs1=1, funct3=0, rd=3,
   // opcode=0x13 instruction = 0x00A08193
@@ -216,7 +231,8 @@ void load_test_addi_program(risc_v_state *state) {
 
 // JALR: jalr x3, 12(x0) then addi x4, x0, 42 at target
 void load_test_jalr_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
 
   // Encoding for: jalr x3, 12(x0)
@@ -245,7 +261,8 @@ void load_test_jalr_program(risc_v_state *state) {
 
 // SLTI: x3 = (x1 < 10) ? 1 : 0 (signed)   (5 < 10 → 1)
 void load_test_slti_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: slti x3, x1, 10
   // imm=10, rs1=1, funct3=0x2, rd=3, opcode=0x13
@@ -260,7 +277,8 @@ void load_test_slti_program(risc_v_state *state) {
 
 // SLTIU: x3 = (x1 < 10) ? 1 : 0 (unsigned)   (5 < 10 → 1)
 void load_test_sltiu_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: sltiu x3, x1, 10
   // imm=10, rs1=1, funct3=0x3, rd=3, opcode=0x13
@@ -275,7 +293,8 @@ void load_test_sltiu_program(risc_v_state *state) {
 
 // XORI: x3 = x1 ^ 0xFF   (0xAA ^ 0xFF = 0x55)
 void load_test_xori_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: xori x3, x1, 0xFF
   // imm=0xFF, rs1=1, funct3=0x4, rd=3, opcode=0x13
@@ -290,7 +309,8 @@ void load_test_xori_program(risc_v_state *state) {
 
 // ORI: x3 = x1 | 0x0F   (0xF0 | 0x0F = 0xFF)
 void load_test_ori_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: ori x3, x1, 0x0F
   // imm=0x0F, rs1=1, funct3=0x6, rd=3, opcode=0x13
@@ -305,7 +325,8 @@ void load_test_ori_program(risc_v_state *state) {
 
 // ANDI: x3 = x1 & 0x0F   (0xFF & 0x0F = 0x0F)
 void load_test_andi_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: andi x3, x1, 0x0F
   // imm=0x0F, rs1=1, funct3=0x7, rd=3, opcode=0x13
@@ -320,7 +341,8 @@ void load_test_andi_program(risc_v_state *state) {
 
 // SLLI: x3 = x1 << 2   (8 << 2 = 32)
 void load_test_slli_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: slli x3, x1, 2
   // imm[11:5]=0, shamt[4:0]=2, rs1=1, funct3=0x1, rd=3, opcode=0x13
@@ -335,7 +357,8 @@ void load_test_slli_program(risc_v_state *state) {
 
 // SRLI: x3 = x1 >> 2 (logical)   (32 >> 2 = 8)
 void load_test_srli_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: srli x3, x1, 2
   // imm[11:5]=0, shamt[4:0]=2, rs1=1, funct3=0x5, rd=3, opcode=0x13
@@ -350,12 +373,14 @@ void load_test_srli_program(risc_v_state *state) {
 
 // SRAI: x3 = x1 >> 2 (arithmetic)   (-8 >> 2 = -2 = 0xFFFFFFFE)
 void load_test_srai_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Encoding for: srai x3, x1, 2
-  // imm[11:5]=0x20 (bit 30 set), shamt[4:0]=2, rs1=1, funct3=0x5, rd=3, opcode=0x13
-  const uint32_t srai_x3_x1_2 =
-      (0x20u << 25) | (2u << 20) | (1u << 15) | (0x5u << 12) | (3u << 7) | (0x13u);
+  // imm[11:5]=0x20 (bit 30 set), shamt[4:0]=2, rs1=1, funct3=0x5, rd=3,
+  // opcode=0x13
+  const uint32_t srai_x3_x1_2 = (0x20u << 25) | (2u << 20) | (1u << 15) |
+                                (0x5u << 12) | (3u << 7) | (0x13u);
   state->memory[0] = srai_x3_x1_2;
   state->regs[REG_x1] = 0xFFFFFFF8u; // -8 in two's complement
   state->pc = 0;
@@ -366,7 +391,8 @@ void load_test_srai_program(risc_v_state *state) {
 // LB: Load byte with sign extension - lb x3, 0(x1)
 // Load 0xAB from memory[0], sign extend to 0xFFFFFFAB (-85 signed)
 void load_test_lb_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lb_x3_0_x1 =
@@ -385,7 +411,8 @@ void load_test_lb_program(risc_v_state *state) {
 // LB: Load negative byte - lb x3, 0(x1)
 // Load 0xFF from memory, sign extend to 0xFFFFFFFF (-1 signed)
 void load_test_lb_negative_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lb_x3_0_x1 =
@@ -404,7 +431,8 @@ void load_test_lb_negative_program(risc_v_state *state) {
 // LH: Load halfword with sign extension - lh x3, 0(x1)
 // Load 0x8000 from memory, sign extend to 0xFFFF8000 (-32768 signed)
 void load_test_lh_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lh_x3_0_x1 =
@@ -423,7 +451,8 @@ void load_test_lh_program(risc_v_state *state) {
 // LH: Load positive halfword - lh x3, 0(x1)
 // Load 0x5678 from memory, sign extend to 0x00005678 (positive)
 void load_test_lh_positive_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lh_x3_0_x1 =
@@ -442,7 +471,8 @@ void load_test_lh_positive_program(risc_v_state *state) {
 // LBU: Load byte unsigned - lbu x3, 0(x1)
 // Load 0xAB from memory, zero extend to 0x000000AB
 void load_test_lbu_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lbu_x3_0_x1 =
@@ -461,7 +491,8 @@ void load_test_lbu_program(risc_v_state *state) {
 // LBU: Load byte unsigned 0xFF - lbu x3, 0(x1)
 // Load 0xFF from memory, zero extend to 0x000000FF (255 unsigned)
 void load_test_lbu_0xff_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lbu_x3_0_x1 =
@@ -480,7 +511,8 @@ void load_test_lbu_0xff_program(risc_v_state *state) {
 // LHU: Load halfword unsigned - lhu x3, 0(x1)
 // Load 0x8000 from memory, zero extend to 0x00008000
 void load_test_lhu_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lhu_x3_0_x1 =
@@ -499,7 +531,8 @@ void load_test_lhu_program(risc_v_state *state) {
 // LHU: Load halfword unsigned from second word - lhu x3, 0(x1)
 // Load 0xFFFF from memory[2], zero extend to 0x0000FFFF
 void load_test_lhu_offset_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lhu_x3_0_x1 =
@@ -518,7 +551,8 @@ void load_test_lhu_offset_program(risc_v_state *state) {
 // LB: Load byte from second word - lb x3, 0(x1)
 // Load 0x56 from memory[2], sign extend to 0x00000056
 void load_test_lb_offset_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lb_x3_0_x1 =
@@ -537,7 +571,8 @@ void load_test_lb_offset_program(risc_v_state *state) {
 // LB: Load byte with sign from third word - lb x3, 0(x1)
 // Load 0x12 from memory[3], sign extend to 0x00000012
 void load_test_lb_offset_3_program(risc_v_state *state) {
-  if (!state) return;
+  if (!state)
+    return;
   reset_state(state);
   // Instruction at memory[0] (byte address 0)
   const uint32_t lb_x3_0_x1 =
@@ -555,7 +590,8 @@ void load_test_lb_offset_3_program(risc_v_state *state) {
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Test runner infrastructure
- * ───────────────────────────────────────────────────────────────────────────── */
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 
 typedef struct {
   const char *name;
@@ -601,7 +637,6 @@ static test_case_t tests[] = {
     {"LHU   x3, 0(x1) [0x8000]", load_test_lhu_program, 0x00008000u},
     {"LHU   x3, 0(x1) [0xFFFF]", load_test_lhu_offset_program, 0x0000FFFFu},
 
-
     {"JALR  x3, 12(x0)", load_test_jalr_program, 42},
 
 };
@@ -610,7 +645,8 @@ static test_case_t tests[] = {
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * main: run all tests
- * ───────────────────────────────────────────────────────────────────────────── */
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 int main(void) {
   int passed = 0, failed = 0;
 
@@ -624,7 +660,8 @@ int main(void) {
   for (size_t i = 0; i < NUM_TESTS; ++i) {
     tests[i].loader(state);
 
-    printf("=============== [TEST_START] RUNNING: %s ===============\n", tests[i].name);
+    printf("=============== [TEST_START] RUNNING: %s ===============\n",
+           tests[i].name);
 
     if (!emulate(state)) {
       printf("[FAIL] %s — emulation error\n", tests[i].name);
@@ -637,8 +674,8 @@ int main(void) {
       printf("[PASS] %s → x3 = 0x%08X\n", tests[i].name, got);
       ++passed;
     } else {
-      printf("[FAIL] %s → x3 = 0x%08X (expected 0x%08X)\n",
-             tests[i].name, got, tests[i].expected_x3);
+      printf("[FAIL] %s → x3 = 0x%08X (expected 0x%08X)\n", tests[i].name, got,
+             tests[i].expected_x3);
       ++failed;
     }
   }

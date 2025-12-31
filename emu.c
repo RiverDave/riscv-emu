@@ -24,9 +24,10 @@ static const char *opcode_names[OPCODE_COUNT] = {
 };
 
 // absolutely diabolical
-#define NO_SEXT +  // This is enough reason to hire me @AMD - @NVIDIA
+#define NO_SEXT + // This is enough reason to hire me @AMD - @NVIDIA
 
-// Sign-extend immediates to 32 bits (TODO: Is there a less hardcoded way to do this?)
+// Sign-extend immediates to 32 bits (TODO: Is there a less hardcoded way to do
+// this?)
 #define SEXT8(x) ((x) & 0x80 ? (x) | 0xFFFFFF00 : (x))
 #define SEXT12(x) ((x) & 0x800 ? (x) | 0xFFFFF000 : (x))
 #define SEXT16(x) ((x) & 0x8000 ? (x) | 0xFFFF0000 : (x))
@@ -47,7 +48,7 @@ bool init_riscv_emu(risc_v_state **state) {
 
 bool is_address_valid(const uint32_t addr) {
   // for simplicity purposes we're only supporting aligned addresses.
-  if (addr % sizeof(uint32_t) != 0){
+  if (addr % sizeof(uint32_t) != 0) {
     fprintf(stderr, "Address not divisible by word size\n");
     return false;
   }
@@ -63,10 +64,9 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
 
   uint32_t opcode = ((instruction >> 0) & 0x7F);
 
-
 // I-type format bit extraction macro
-#define I_DECODE(i) \
-  uint32_t rd = ((i) >> 7) & 0x1F, funct3 = ((i) >> 12) & 0x7, \
+#define I_DECODE(i)                                                            \
+  uint32_t rd = ((i) >> 7) & 0x1F, funct3 = ((i) >> 12) & 0x7,                 \
            rs1 = ((i) >> 15) & 0x1F, imm = ((i) >> 20) & 0xFFF
 
   switch (opcode) {
@@ -130,44 +130,46 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
 
   case I_FMT: {
     I_DECODE(instruction);
-    // FIXME: Tons of lines here perhaps we can reftor it nicer - with some macro magic
+    // FIXME: Tons of lines here perhaps we can reftor it nicer - with some
+    // macro magic
     switch (funct3) {
     case 0x00:
       result->name = ADDI;
-     break;
+      break;
 
     case 0x4:
       result->name = XORI;
-    break;
+      break;
 
     case 0x6:
       result->name = ORI;
-    break;
+      break;
 
     case 0x7:
       result->name = ANDI;
-    break;
+      break;
 
     case 0x1:
       result->name = SLLI;
-    break;
+      break;
 
     case 0x5: {
-      // TODO: This nit line might be duplicate in the execution, will refactor later.
+      // TODO: This nit line might be duplicate in the execution, will refactor
+      // later.
       uint32_t id = ((imm) >> 5) & 0x7F;
-      if(id)
-            result->name = SRAI;
+      if (id)
+        result->name = SRAI;
       else
-            result->name = SRLI;
-    }break;
+        result->name = SRLI;
+    } break;
 
     case 0x2:
       result->name = SLTI;
-    break;
+      break;
 
     case 0x3:
       result->name = SLTIU;
-    break;
+      break;
 
     default:
       assert(false && "I-FMT instruction not implemented");
@@ -186,19 +188,19 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     switch (funct3) {
     case 0x0:
       result->name = LB;
-    break;
+      break;
     case 0x1:
       result->name = LH;
-    break;
+      break;
     case 0x2:
       result->name = LW;
-    break;
+      break;
     case 0x4:
       result->name = LBU;
-    break;
+      break;
     case 0x5:
       result->name = LHU;
-    break;
+      break;
     default:
       return false;
     }
@@ -215,7 +217,7 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     if (!funct3) // might not be needed but just to make sure we get it right.
       result->name = JALR;
     else
-        assert(false && "I-JMP-FMT instruction not implemented");
+      assert(false && "I-JMP-FMT instruction not implemented");
 
     result->ops[0] = rd;
     result->ops[1] = rs1;
@@ -256,12 +258,12 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
 
 #undef I_DECODE
 
-    #ifdef VERBOSE
-    fprintf(stdout, "[VERBOSE] decoded: instruction=0x%08x opcode=%s pc=0x%x\n",
-            instruction, opcode_names[result->name], state->pc);
-    #endif
+#ifdef VERBOSE
+  fprintf(stdout, "[VERBOSE] decoded: instruction=0x%08x opcode=%s pc=0x%x\n",
+          instruction, opcode_names[result->name], state->pc);
+#endif
 
-    return true; // success
+  return true; // success
 }
 
 void print_registers(const risc_v_state *state) {
@@ -304,8 +306,10 @@ bool is_riscv_state_valid(const risc_v_state *state) {
   return state->memory[index] != 0x00;
 }
 
-static uint32_t read_bytes(const risc_v_state *state, uint32_t addr, uint32_t mask) {
-   assert(is_address_valid(addr) && "Invalid address for read_byte, might be unaligned?");
+static uint32_t read_bytes(const risc_v_state *state, uint32_t addr,
+                           uint32_t mask) {
+  assert(is_address_valid(addr) &&
+         "Invalid address for read_byte, might be unaligned?");
   return (state->memory[addr / 4] >> (8 * (addr % 4))) & mask;
 }
 
@@ -313,65 +317,75 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
   if (!state || !insn)
     return;
 
-
-  #ifdef VERBOSE
-    fprintf(stdout, "[VERBOSE] executing: opcode=%s pc=0x%x\n",
-            opcode_names[insn->name], state->pc);
-  #endif
+#ifdef VERBOSE
+  fprintf(stdout, "[VERBOSE] executing: opcode=%s pc=0x%x\n",
+          opcode_names[insn->name], state->pc);
+#endif
 
 // R-format instruction execution macro
-#define R_OP(name, op) \
-  case name: { \
-    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], rs2 = insn->ops[2]; \
-    if (rd != REG_x0) state->regs[rd] = state->regs[rs1] op state->regs[rs2]; \
-    state->pc += 4; break; }
+#define R_OP(name, op)                                                         \
+  case name: {                                                                 \
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], rs2 = insn->ops[2];        \
+    if (rd != REG_x0)                                                          \
+      state->regs[rd] = state->regs[rs1] op state->regs[rs2];                  \
+    state->pc += 4;                                                            \
+    break;                                                                     \
+  }
 
-#define I_OP(name, op) \
-  case name: { \
-    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = SEXT12(insn->ops[2]); \
-    if (rd != REG_x0) state->regs[rd] = state->regs[rs1] op imm; \
-    state->pc += 4; break; }
+#define I_OP(name, op)                                                         \
+  case name: {                                                                 \
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1],                            \
+             imm = SEXT12(insn->ops[2]);                                       \
+    if (rd != REG_x0)                                                          \
+      state->regs[rd] = state->regs[rs1] op imm;                               \
+    state->pc += 4;                                                            \
+    break;                                                                     \
+  }
 
-#define LOAD_OP(name, mask, SEXT_FUN, sext) \
-case name: { \
-    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = SEXT12(insn->ops[2]); \
-    uint32_t addr = state->regs[rs1] + imm; \
+#define LOAD_OP(name, mask, SEXT_FUN, sext)                                    \
+  case name: {                                                                 \
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1],                            \
+             imm = SEXT12(insn->ops[2]);                                       \
+    uint32_t addr = state->regs[rs1] + imm;                                    \
     TRY_OR_EXIT(is_address_valid(addr), "Invalid address for LW Instruction"); \
-    uint32_t bytes_read = read_bytes(state, addr, mask); \
-    if(sext) \
-      bytes_read =  SEXT_FUN(bytes_read); \
-    if (rd != REG_x0) state->regs[rd] = bytes_read; \
-    state->pc += 4; break; }
+    uint32_t bytes_read = read_bytes(state, addr, mask);                       \
+    if (sext)                                                                  \
+      bytes_read = SEXT_FUN(bytes_read);                                       \
+    if (rd != REG_x0)                                                          \
+      state->regs[rd] = bytes_read;                                            \
+    state->pc += 4;                                                            \
+    break;                                                                     \
+  }
 
   switch (insn->name) {
 
-  // == I FMT exec
-  I_OP(ADDI, +)
-  I_OP(XORI, ^)
-  I_OP(ORI, |)
-  I_OP(ANDI, &)
-  I_OP(SLLI, <<)
+    // == I FMT exec
+    I_OP(ADDI, +)
+    I_OP(XORI, ^)
+    I_OP(ORI, |)
+    I_OP(ANDI, &)
+    I_OP(SLLI, <<)
 
   case SRLI:
-  case SRAI:{
+  case SRAI: {
     uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = insn->ops[2];
     uint32_t id = ((imm) >> 5) & 0x7F;
     uint32_t shamt = imm & 0x1F;
 
-    if(rd != REG_x0)
-        state->regs[rd] = id ? (uint32_t)((int32_t)state->regs[rs1] >> shamt) :
-            state->regs[rs1] >> shamt;
+    if (rd != REG_x0)
+      state->regs[rd] = id ? (uint32_t)((int32_t)state->regs[rs1] >> shamt)
+                           : state->regs[rs1] >> shamt;
     state->pc += 4;
   } break;
 
   case SLTI:
   case SLTIU: {
-      uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = SEXT12(insn->ops[2]);
-      if (rd != REG_x0)
-        state->regs[rd] = (insn->name == SLT)
-          ? ((int32_t)state->regs[rs1] < (int32_t)imm)
-          : (state->regs[rs1] < imm);
-      state->pc += 4;
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = SEXT12(insn->ops[2]);
+    if (rd != REG_x0)
+      state->regs[rd] = (insn->name == SLT)
+                            ? ((int32_t)state->regs[rs1] < (int32_t)imm)
+                            : (state->regs[rs1] < imm);
+    state->pc += 4;
   } break;
 
   case SW: {
@@ -383,7 +397,6 @@ case name: { \
 
     uint32_t addr = state->regs[rs1] + imm; // byte address
 
-
     // FIXME The quality of these errors might not be to good rn. will come back
     // later.
     TRY_OR_EXIT(is_address_valid(addr), "Invalid address for SW Instruction");
@@ -393,8 +406,8 @@ case name: { \
     state->pc += 4;
   } break;
 
-  // == LOAD exec
-  
+    // == LOAD exec
+
     LOAD_OP(LW, /*mask=*/0xFFFFFFFF, NO_SEXT, /*sext=*/false)
     LOAD_OP(LH, /*mask=*/0xFFFF, /*sext=*/SEXT16, true)
     LOAD_OP(LB, /*mask=*/0xFF, SEXT8, /*sext=*/true)
@@ -425,20 +438,21 @@ case name: { \
     state->pc = jmp_addr;
   } break;
 
-  // == I FMT exec
+    // == I FMT exec
 
-  R_OP(ADD, +)
-  R_OP(SUB, -)
-  R_OP(XOR, ^)
-  R_OP(OR,  |)
-  R_OP(AND, &)
-  R_OP(SLL, <<)
-  R_OP(SRL, >>)
+    R_OP(ADD, +)
+    R_OP(SUB, -)
+    R_OP(XOR, ^)
+    R_OP(OR, |)
+    R_OP(AND, &)
+    R_OP(SLL, <<)
+    R_OP(SRL, >>)
 
   case SRA: {
     uint32_t rd = insn->ops[0], rs1 = insn->ops[1], rs2 = insn->ops[2];
     if (rd != REG_x0)
-      state->regs[rd] = (uint32_t)((int32_t)state->regs[rs1] >> state->regs[rs2]);
+      state->regs[rd] =
+          (uint32_t)((int32_t)state->regs[rs1] >> state->regs[rs2]);
     state->pc += 4;
     break;
   }
@@ -447,9 +461,10 @@ case name: { \
   case SLT: {
     uint32_t rd = insn->ops[0], rs1 = insn->ops[1], rs2 = insn->ops[2];
     if (rd != REG_x0)
-      state->regs[rd] = (insn->name == SLT)
-        ? ((int32_t)state->regs[rs1] < (int32_t)state->regs[rs2])
-        : (state->regs[rs1] < state->regs[rs2]);
+      state->regs[rd] =
+          (insn->name == SLT)
+              ? ((int32_t)state->regs[rs1] < (int32_t)state->regs[rs2])
+              : (state->regs[rs1] < state->regs[rs2]);
     state->pc += 4;
     break;
   }
@@ -473,7 +488,8 @@ bool emulate(risc_v_state *state) {
     // 2. Fetch the instruction word using the index.
     const uint32_t word = state->memory[index];
     Instruction instruction;
-    if(!decode_instruction(state, word, &instruction) || instruction.name == INVALID) {
+    if (!decode_instruction(state, word, &instruction) ||
+        instruction.name == INVALID) {
       fprintf(stderr, "Failure decoding instruction\n");
       return false;
     }
@@ -489,10 +505,11 @@ bool load_binary(risc_v_state *state, const char *filename) {
     return false;
 
   FILE *f = fopen(filename, "rb");
-  if (!f) return false;
+  if (!f)
+    return false;
   size_t max_bytes = MEMORY_SIZE * sizeof(uint32_t);
   // Read directly into state->memory; cast to uint8_t* for byte-level read
-  size_t bytes_read = fread((uint8_t*)state->memory, 1, max_bytes, f);
+  size_t bytes_read = fread((uint8_t *)state->memory, 1, max_bytes, f);
   if (ferror(f)) {
     fclose(f);
     return false;
@@ -503,7 +520,8 @@ bool load_binary(risc_v_state *state, const char *filename) {
     fprintf(stderr, "Warning: binary truncated to %zu bytes\n", max_bytes);
   }
   fclose(f);
-  if (bytes_read == 0) return false;
+  if (bytes_read == 0)
+    return false;
   state->pc = 0;
   state->is_valid = true;
   state->is_running = true;
@@ -511,11 +529,11 @@ bool load_binary(risc_v_state *state, const char *filename) {
 }
 
 #ifndef EMU_NO_MAIN
-int main(int argc, char* argv[]) {
-  risc_v_state* state = NULL;
+int main(int argc, char *argv[]) {
+  risc_v_state *state = NULL;
   TRY_OR_EXIT(init_riscv_emu(&state), "Failed to initialize riscv state");
   assert(state != NULL);
-  if(argc > 1 )
+  if (argc > 1)
     TRY_OR_EXIT(load_binary(state, argv[1]), "Failed to load binary");
   emulate(state);
   puts("\n======= DUMPING EMU STATE =======\n");
