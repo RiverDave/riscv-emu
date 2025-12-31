@@ -24,7 +24,7 @@ static const char *opcode_names[OPCODE_COUNT] = {
 };
 
 // absolutely diabolical
-#define NO_MACRO +  // This is enough reason to hire me @AMD - @NVIDIA
+#define NO_SEXT +  // This is enough reason to hire me @AMD - @NVIDIA
 
 // Sign-extend immediates to 32 bits (TODO: Is there a less hardcoded way to do this?)
 #define SEXT8(x) ((x) & 0x80 ? (x) | 0xFFFFFF00 : (x))
@@ -395,12 +395,12 @@ case name: { \
 
   // == LOAD exec
   
-    LOAD_OP(LW, /*mask=*/0xFFFFFFFF, NO_MACRO, /*sext=*/false)
+    LOAD_OP(LW, /*mask=*/0xFFFFFFFF, NO_SEXT, /*sext=*/false)
     LOAD_OP(LH, /*mask=*/0xFFFF, /*sext=*/SEXT16, true)
     LOAD_OP(LB, /*mask=*/0xFF, SEXT8, /*sext=*/true)
     // preserve msb if 0 so no sext macro magic needed
-    LOAD_OP(LBU, /*mask=*/0xFF, NO_MACRO, /*sext=*/false)
-    LOAD_OP(LHU, /*mask=*/0xFFFF, NO_MACRO, /*sext=*/false)
+    LOAD_OP(LBU, /*mask=*/0xFF, NO_SEXT, /*sext=*/false)
+    LOAD_OP(LHU, /*mask=*/0xFFFF, NO_SEXT, /*sext=*/false)
 
   case JALR: {
     uint32_t rd = insn->ops[0];
