@@ -185,10 +185,10 @@ void load_test_sw_program(risc_v_state *state) {
 void load_test_lw_program(risc_v_state *state) {
   if (!state) return;
   reset_state(state);
-  // Place a data word at memory[1] (byte addr 4)
+  // Place a data word at memory[2] (byte addr 8)
   state->memory[2] = 0xCAFEBABEu;
 
-  // Encoding for: lw x3, 4(x1)
+  // Encoding for: lw x3, 8(x1)
   // imm=4, rs1=1, funct3=0x2, rd=3, opcode=0x03 -> construct 32-bit
   const uint32_t lw_x3_4_x1 =
       (8u << 20) | (1u << 15) | (0x2u << 12) | (3u << 7) | (0x03u);
@@ -420,6 +420,8 @@ int main(void) {
 
   for (size_t i = 0; i < NUM_TESTS; ++i) {
     tests[i].loader(state);
+
+    printf("=============== [TEST_START] RUNNING: %s ===============\n", tests[i].name);
 
     if (!emulate(state)) {
       printf("[FAIL] %s — emulation error\n", tests[i].name);

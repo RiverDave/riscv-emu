@@ -1,7 +1,6 @@
 CC := cc
 CFLAGS := -std=c11 -Wall -Wextra
 DEBUG_CFLAGS := -g -O0
-DEBUG_VERBOSE := -DDEBUG
 RELEASE_CFLAGS := -O2
 
 SRCS := emu.c
@@ -17,6 +16,11 @@ all: $(TARGET)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+
+ifeq ($(VERBOSE), 1)
+CC += -DDEBUG
+endif
 
 # Compile emu core (without main) as object file for linking with tests
 $(EMU_OBJ): $(BUILD_DIR) $(SRCS) emu.h

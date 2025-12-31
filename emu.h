@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Constants
@@ -91,32 +92,44 @@ typedef struct {
  * Opcodes / Instruction formats
  * ───────────────────────────────────────────────────────────────────────────── */
 
-typedef enum {
-  ADD,
-  SUB,
-  // ==== I FMT instructions =======
-  ADDI,
-  XORI,
-  ORI,
-  ANDI,
-  SLLI,
-  SRLI,
-  SRAI,
-  SLTI,
-  SLTIU,
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Opcode X-macro: name only
+ * ───────────────────────────────────────────────────────────────────────────── */
 
-  SW,
-  LW,
-  // ================================
-  JALR,
-  XOR,
-  OR,
-  AND,
-  SLL,
-  SRL,
-  SRA,
-  SLT,
-  SLTU,
+#define OPCODES \
+  X(INVALID) \
+  X(ADD) \
+  X(SUB) \
+  X(ADDI) \
+  X(XORI) \
+  X(ORI) \
+  X(ANDI) \
+  X(SLLI) \
+  X(SRLI) \
+  X(SRAI) \
+  X(SLTI) \
+  X(SLTIU) \
+  X(SW) \
+  X(LW) \
+  X(LB) \
+  X(LH) \
+  X(LBU) \
+  X(LHU) \
+  X(JALR) \
+  X(XOR) \
+  X(OR) \
+  X(AND) \
+  X(SLL) \
+  X(SRL) \
+  X(SRA) \
+  X(SLT) \
+  X(SLTU)
+
+typedef enum {
+#define X(name) name,
+  OPCODES
+#undef X
+  OPCODE_COUNT
 } Opcode;
 
 // source:
@@ -150,5 +163,6 @@ bool emulate(risc_v_state *state);
 void print_registers(const risc_v_state *state);
 void print_memory(const risc_v_state *state, uint32_t start_addr_bytes,
                   uint32_t word_count);
+const char *opcode_to_string(Opcode op);
 
 #endif /* EMU_H */

@@ -11,6 +11,18 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+static const char *reg_names[REG_COUNT] = {
+#define X(name, str) [REG_##name] = str,
+    REGISTERS
+#undef X
+};
+
+static const char *opcode_names[OPCODE_COUNT] = {
+#define X(name) [name] = #name,
+    OPCODES
+#undef X
+};
+
 // Sign-extend 12-bit immediate to 32-bit
 #define SEXT12(x) ((x) & 0x800 ? (x) | 0xFFFFF000 : (x))
 
@@ -29,7 +41,7 @@ bool init_riscv_emu(risc_v_state **state) {
 }
 
 bool is_address_valid(const uint32_t addr) {
-  // for simplicity purposes we're only supported aligned addresses.
+  // for simplicity purposes we're only supporting aligned addresses.
   if (addr % sizeof(uint32_t) != 0){
     fprintf(stderr, "Address not divisible by word size\n");
     return false;
@@ -45,10 +57,7 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     return false;
 
   uint32_t opcode = ((instruction >> 0) & 0x7F);
-#ifdef DEBUG
-  fprintf(stderr, "[DEBUG] decoded: instruction=0x%08x opcode=0x%02x pc=0x%x\n",
-          instruction, opcode, state->pc);
-#endif
+
 
 // I-type format bit extraction macro
 #define I_DECODE(i) \
@@ -112,7 +121,6 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     result->ops[0] = rd;
     result->ops[1] = rs1;
     result->ops[2] = rs2;
-    return true; // success
   } break;
 
   case I_FMT: {
@@ -163,7 +171,6 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     result->ops[0] = rd;
     result->ops[1] = rs1;
     result->ops[2] = imm;
-    return true; // success
     assert((rd < REG_COUNT && rs1 < REG_COUNT) && "Invalid register val");
 
   } break;
@@ -182,23 +189,20 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     result->ops[0] = rd;
     result->ops[1] = rs1;
     result->ops[2] = imm;
-    return true;
   } break;
 
   case I_JMP_FMT: { // used mainly for jalr, Not to confuse with jal which has
                     // its own opcode.
     I_DECODE(instruction);
 
-    if (funct3 ==
-        0x00) // might not be needed but just to make sure we get it right.
+    if (!funct3) // might not be needed but just to make sure we get it right.
       result->name = JALR;
     else
-      return false;
+        assert(false && "I-JMP-FMT instruction not implemented");
 
     result->ops[0] = rd;
     result->ops[1] = rs1;
     result->ops[2] = imm;
-    return true;
   } break;
 
   case S_FMT: {
@@ -226,23 +230,22 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     result->ops[1] = rs2;
     result->ops[2] = imm_final;
 
-    return true;
   } break;
   default: {
-    if (!opcode)
-      return false; // temporarily, this should crash
-                   // Will make it work after we figure out syscalls
+    if (!opcode) // Other opcodes TBD
+      return false;
   }
   }
-  return false;
-#undef I_DECODE
-}
 
-static const char *reg_names[REG_COUNT] = {
-#define X(name, str) [REG_##name] = str,
-    REGISTERS
-#undef X
-};
+#undef I_DECODE
+
+    #ifdef VERBOSE
+    fprintf(stdout, "[VERBOSE] decoded: instruction=0x%08x opcode=%s pc=0x%x\n",
+            instruction, opcode_names[result->name], state->pc);
+    #endif
+
+    return true; // success
+}
 
 void print_registers(const risc_v_state *state) {
   if (!state)
@@ -287,6 +290,12 @@ bool is_riscv_state_valid(const risc_v_state *state) {
 void execute_instruction(risc_v_state *state, const Instruction *insn) {
   if (!state || !insn)
     return;
+
+
+  #ifdef VERBOSE
+    fprintf(stdout, "[VERBOSE] executing: opcode=%s pc=0x%x\n",
+            opcode_names[insn->name], state->pc);
+  #endif
 
 // R-format instruction execution macro
 #define R_OP(name, op) \
@@ -480,7 +489,9 @@ int main(int argc, char* argv[]) {
   if(argc > 1 )
     TRY_OR_EXIT(load_binary(state, argv[1]), "Failed to load binary");
   emulate(state);
+  puts("\n======= DUMPING EMU STATE =======\n");
   print_registers(state);
+  puts("\n");
   print_memory(state, 0, 16);
 
   free(state); // cleanup
