@@ -363,6 +363,196 @@ void load_test_srai_program(risc_v_state *state) {
   state->is_running = true;
 }
 
+// LB: Load byte with sign extension - lb x3, 0(x1)
+// Load 0xAB from memory[0], sign extend to 0xFFFFFFAB (-85 signed)
+void load_test_lb_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lb_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x0u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lb_x3_0_x1;
+
+  // Data at memory[1] (byte address 4)
+  state->memory[1] = 0x000000ABu; // Load byte 0xAB
+
+  state->regs[REG_x1] = 4; // base address (points to memory[1])
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LB: Load negative byte - lb x3, 0(x1)
+// Load 0xFF from memory, sign extend to 0xFFFFFFFF (-1 signed)
+void load_test_lb_negative_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lb_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x0u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lb_x3_0_x1;
+
+  // Data at memory[1] (byte address 4)
+  state->memory[1] = 0x000000FFu; // Load byte 0xFF
+
+  state->regs[REG_x1] = 4; // base address
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LH: Load halfword with sign extension - lh x3, 0(x1)
+// Load 0x8000 from memory, sign extend to 0xFFFF8000 (-32768 signed)
+void load_test_lh_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lh_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x1u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lh_x3_0_x1;
+
+  // Data at memory[2] (byte address 0x8)
+  state->memory[2] = 0x12348000u; // Load halfword 0x8000 (lower halfword)
+
+  state->regs[REG_x1] = 8; // base address
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LH: Load positive halfword - lh x3, 0(x1)
+// Load 0x5678 from memory, sign extend to 0x00005678 (positive)
+void load_test_lh_positive_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lh_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x1u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lh_x3_0_x1;
+
+  // Data at memory[1] (byte address 4)
+  state->memory[1] = 0x12345678u; // Load halfword 0x5678 (lower halfword)
+
+  state->regs[REG_x1] = 4; // base address
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LBU: Load byte unsigned - lbu x3, 0(x1)
+// Load 0xAB from memory, zero extend to 0x000000AB
+void load_test_lbu_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lbu_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x4u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lbu_x3_0_x1;
+
+  // Data at memory[1] (byte address 4)
+  state->memory[1] = 0x000000ABu; // Load byte 0xAB
+
+  state->regs[REG_x1] = 4; // base address
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LBU: Load byte unsigned 0xFF - lbu x3, 0(x1)
+// Load 0xFF from memory, zero extend to 0x000000FF (255 unsigned)
+void load_test_lbu_0xff_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lbu_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x4u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lbu_x3_0_x1;
+
+  // Data at memory[1] (byte address 4)
+  state->memory[1] = 0x000000FFu; // Load byte 0xFF
+
+  state->regs[REG_x1] = 4; // base address
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LHU: Load halfword unsigned - lhu x3, 0(x1)
+// Load 0x8000 from memory, zero extend to 0x00008000
+void load_test_lhu_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lhu_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x5u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lhu_x3_0_x1;
+
+  // Data at memory[2] (byte address 8)
+  state->memory[2] = 0x12348000u; // Load halfword 0x8000 (lower halfword)
+
+  state->regs[REG_x1] = 8; // base address
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LHU: Load halfword unsigned from second word - lhu x3, 0(x1)
+// Load 0xFFFF from memory[2], zero extend to 0x0000FFFF
+void load_test_lhu_offset_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lhu_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x5u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lhu_x3_0_x1;
+
+  // Data at memory[2] (byte address 8)
+  state->memory[2] = 0x1234FFFFu; // Load halfword 0xFFFF (lower halfword)
+
+  state->regs[REG_x1] = 8; // base address (points to memory[2])
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LB: Load byte from second word - lb x3, 0(x1)
+// Load 0x56 from memory[2], sign extend to 0x00000056
+void load_test_lb_offset_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lb_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x0u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lb_x3_0_x1;
+
+  // Data at memory[2] (byte address 8)
+  state->memory[2] = 0x12345678u; // byte 0 is 0x78
+
+  state->regs[REG_x1] = 8; // base address
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// LB: Load byte with sign from third word - lb x3, 0(x1)
+// Load 0x12 from memory[3], sign extend to 0x00000012
+void load_test_lb_offset_3_program(risc_v_state *state) {
+  if (!state) return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  const uint32_t lb_x3_0_x1 =
+      (0u << 20) | (1u << 15) | (0x0u << 12) | (3u << 7) | (0x03u);
+  state->memory[0] = lb_x3_0_x1;
+
+  // Data at memory[3] (byte address 12)
+  state->memory[3] = 0x12345678u; // byte 0 is 0x78
+
+  state->regs[REG_x1] = 12; // base address (points to memory[3])
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * Test runner infrastructure
  * ───────────────────────────────────────────────────────────────────────────── */
@@ -397,8 +587,21 @@ static test_case_t tests[] = {
     {"SRLI  x3, x1, 2", load_test_srli_program, 8},
     {"SRAI  x3, x1, 2", load_test_srai_program, 0xFFFFFFFEu},
 
-    // Others TBD
+    // Load instructions (I-format, opcode 0x03)
     {"LW    x3, 4(x1)", load_test_lw_program, 0xCAFEBABEu},
+    {"LB    x3, 0(x1)", load_test_lb_program, 0xFFFFFFABu},
+    {"LB    x3, 0(x1) [0xFF]", load_test_lb_negative_program, 0xFFFFFFFFu},
+    {"LB    x3, 0(x1) [0x78]", load_test_lb_offset_program, 0x00000078u},
+    {"LB    x3, 0(x1) [0x78]", load_test_lb_offset_3_program, 0x00000078u},
+    {"LH    x3, 0(x1) [0x8000]", load_test_lh_program, 0xFFFF8000u},
+    {"LH    x3, 0(x1) [0x5678]", load_test_lh_positive_program, 0x00005678u},
+
+    {"LBU   x3, 0(x1) [0xAB]", load_test_lbu_program, 0x000000ABu},
+    {"LBU   x3, 0(x1) [0xFF]", load_test_lbu_0xff_program, 0x000000FFu},
+    {"LHU   x3, 0(x1) [0x8000]", load_test_lhu_program, 0x00008000u},
+    {"LHU   x3, 0(x1) [0xFFFF]", load_test_lhu_offset_program, 0x0000FFFFu},
+
+
     {"JALR  x3, 12(x0)", load_test_jalr_program, 42},
 
 };

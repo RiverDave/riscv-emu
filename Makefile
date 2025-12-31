@@ -19,7 +19,7 @@ $(BUILD_DIR):
 
 
 ifeq ($(VERBOSE), 1)
-CC += -DDEBUG
+CC += -DVERBOSE
 endif
 
 # Compile emu core (without main) as object file for linking with tests

@@ -23,8 +23,13 @@ static const char *opcode_names[OPCODE_COUNT] = {
 #undef X
 };
 
-// Sign-extend 12-bit immediate to 32-bit
+// absolutely diabolical
+#define NO_MACRO +  // This is enough reason to hire me @AMD - @NVIDIA
+
+// Sign-extend immediates to 32 bits (TODO: Is there a less hardcoded way to do this?)
+#define SEXT8(x) ((x) & 0x80 ? (x) | 0xFFFFFF00 : (x))
 #define SEXT12(x) ((x) & 0x800 ? (x) | 0xFFFFF000 : (x))
+#define SEXT16(x) ((x) & 0x8000 ? (x) | 0xFFFF0000 : (x))
 
 bool init_riscv_emu(risc_v_state **state) {
   *state = malloc(sizeof(risc_v_state));
@@ -179,9 +184,21 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     I_DECODE(instruction);
 
     switch (funct3) {
-    case 0x2: // lw
+    case 0x0:
+      result->name = LB;
+    break;
+    case 0x1:
+      result->name = LH;
+    break;
+    case 0x2:
       result->name = LW;
-      break;
+    break;
+    case 0x4:
+      result->name = LBU;
+    break;
+    case 0x5:
+      result->name = LHU;
+    break;
     default:
       return false;
     }
@@ -287,6 +304,11 @@ bool is_riscv_state_valid(const risc_v_state *state) {
   return state->memory[index] != 0x00;
 }
 
+static uint32_t read_bytes(const risc_v_state *state, uint32_t addr, uint32_t mask) {
+   assert(is_address_valid(addr) && "Invalid address for read_byte, might be unaligned?");
+  return (state->memory[addr / 4] >> (8 * (addr % 4))) & mask;
+}
+
 void execute_instruction(risc_v_state *state, const Instruction *insn) {
   if (!state || !insn)
     return;
@@ -308,6 +330,17 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
   case name: { \
     uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = SEXT12(insn->ops[2]); \
     if (rd != REG_x0) state->regs[rd] = state->regs[rs1] op imm; \
+    state->pc += 4; break; }
+
+#define LOAD_OP(name, mask, SEXT_FUN, sext) \
+case name: { \
+    uint32_t rd = insn->ops[0], rs1 = insn->ops[1], imm = SEXT12(insn->ops[2]); \
+    uint32_t addr = state->regs[rs1] + imm; \
+    TRY_OR_EXIT(is_address_valid(addr), "Invalid address for LW Instruction"); \
+    uint32_t bytes_read = read_bytes(state, addr, mask); \
+    if(sext) \
+      bytes_read =  SEXT_FUN(bytes_read); \
+    if (rd != REG_x0) state->regs[rd] = bytes_read; \
     state->pc += 4; break; }
 
   switch (insn->name) {
@@ -360,18 +393,14 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     state->pc += 4;
   } break;
 
-  case LW: {
-
-    uint32_t rd = insn->ops[0];
-    uint32_t rs1 = insn->ops[1];
-    int32_t imm = SEXT12(insn->ops[2]);
-
-    uint32_t addr = state->regs[rs1] + imm; // byte address
-    TRY_OR_EXIT(is_address_valid(addr), "Invalid address for LW Instruction");
-    uint32_t index = addr / sizeof(uint32_t);
-    state->regs[rd] = state->memory[index];
-    state->pc += 4;
-  } break;
+  // == LOAD exec
+  
+    LOAD_OP(LW, /*mask=*/0xFFFFFFFF, NO_MACRO, /*sext=*/false)
+    LOAD_OP(LH, /*mask=*/0xFFFF, /*sext=*/SEXT16, true)
+    LOAD_OP(LB, /*mask=*/0xFF, SEXT8, /*sext=*/true)
+    // preserve msb if 0 so no sext macro magic needed
+    LOAD_OP(LBU, /*mask=*/0xFF, NO_MACRO, /*sext=*/false)
+    LOAD_OP(LHU, /*mask=*/0xFFFF, NO_MACRO, /*sext=*/false)
 
   case JALR: {
     uint32_t rd = insn->ops[0];
@@ -444,7 +473,7 @@ bool emulate(risc_v_state *state) {
     // 2. Fetch the instruction word using the index.
     const uint32_t word = state->memory[index];
     Instruction instruction;
-    if(!decode_instruction(state, word, &instruction)) {
+    if(!decode_instruction(state, word, &instruction) || instruction.name == INVALID) {
       fprintf(stderr, "Failure decoding instruction\n");
       return false;
     }
