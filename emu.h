@@ -115,6 +115,8 @@ typedef struct {
   X(SRAI)                                                                      \
   X(SLTI)                                                                      \
   X(SLTIU)                                                                     \
+  X(SB)                                                                        \
+  X(SH)                                                                        \
   X(SW)                                                                        \
   X(LW)                                                                        \
   X(LB)                                                                        \

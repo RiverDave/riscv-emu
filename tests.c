@@ -176,19 +176,131 @@ void load_test_sltu_program(risc_v_state *state) {
   state->is_running = true;
 }
 
-// SW: store word - sw x2, 0(x1)
+// SB: Store byte - sb x5, 0(x1)
+// Store byte 0xAB to memory[1] at byte offset 0
+void load_test_sb_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  // Instruction at memory[0] (byte address 0)
+  // Encoding for: sb x5, 0(x1)
+  // imm[11:5]=0, rs2=5, rs1=1, funct3=0x0, imm[4:0]=0, opcode=0x23
+  const uint32_t sb_x5_0_x1 =
+      (0u << 25) | (5u << 20) | (1u << 15) | (0x0u << 12) | (0u << 7) | (0x23u);
+  state->memory[0] = sb_x5_0_x1;
+
+  // Data will be stored at memory[1]
+  state->memory[1] = 0x00000000u; // Initially cleared
+
+  state->regs[REG_x1] = 4;     // base address (points to memory[1])
+  state->regs[REG_x5] = 0xABu; // byte value to store
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SB: Store byte with different value - sb x5, 0(x1)
+// Store byte 0xFF to memory[1]
+void load_test_sb_0xff_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  // Instruction at memory[0]
+  const uint32_t sb_x5_0_x1 =
+      (0u << 25) | (5u << 20) | (1u << 15) | (0x0u << 12) | (0u << 7) | (0x23u);
+  state->memory[0] = sb_x5_0_x1;
+
+  state->memory[1] = 0x00000000u;
+
+  state->regs[REG_x1] = 4;     // base address
+  state->regs[REG_x5] = 0xFFu; // byte value to store
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SH: Store halfword - sh x5, 0(x1)
+// Store halfword 0x1234 to memory[1] at offset 0
+void load_test_sh_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  // Instruction at memory[0]
+  // Encoding for: sh x5, 0(x1)
+  // imm[11:5]=0, rs2=5, rs1=1, funct3=0x1, imm[4:0]=0, opcode=0x23
+  const uint32_t sh_x5_0_x1 =
+      (0u << 25) | (5u << 20) | (1u << 15) | (0x1u << 12) | (0u << 7) | (0x23u);
+  state->memory[0] = sh_x5_0_x1;
+
+  // Data will be stored at memory[1]
+  state->memory[1] = 0x00000000u; // Initially cleared
+
+  state->regs[REG_x1] = 4;       // base address
+  state->regs[REG_x5] = 0x1234u; // halfword value to store
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SH: Store halfword - sh x5, 0(x1)
+// Store halfword 0x8000 (with sign bit) to memory[1]
+void load_test_sh_negative_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  // Instruction at memory[0]
+  const uint32_t sh_x5_0_x1 =
+      (0u << 25) | (5u << 20) | (1u << 15) | (0x1u << 12) | (0u << 7) | (0x23u);
+  state->memory[0] = sh_x5_0_x1;
+
+  state->memory[1] = 0x00000000u;
+
+  state->regs[REG_x1] = 4;       // base address
+  state->regs[REG_x5] = 0x8000u; // halfword value to store
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SW: Store word - sw x5, 0(x1)
+// Store word 0xDEADBEEF to memory[1]
 void load_test_sw_program(risc_v_state *state) {
   if (!state)
     return;
   reset_state(state);
-  // Encoding for: sw x2, 0(x1)
-  // imm[11:5]=0, rs2=2, rs1=1, funct3=0x2, imm[4:0]=0, opcode=0x23 ->
-  // 0x0020A023
-  const uint32_t sw_x2_0_x1 = 0x0020A023u;
-  state->memory[0] = sw_x2_0_x1;
-  // Prepare registers: base in x1, value in x2
-  state->regs[REG_x1] = 0;           // base address 0
-  state->regs[REG_x2] = 0xDEADBEEFu; // value to store
+  // Instruction at memory[0]
+  // Encoding for: sw x5, 0(x1)
+  // imm[11:5]=0, rs2=5, rs1=1, funct3=0x2, imm[4:0]=0, opcode=0x23
+  const uint32_t sw_x5_0_x1 =
+      (0u << 25) | (5u << 20) | (1u << 15) | (0x2u << 12) | (0u << 7) | (0x23u);
+  state->memory[0] = sw_x5_0_x1;
+
+  // Data will be stored at memory[1]
+  state->memory[1] = 0x00000000u; // Initially cleared
+
+  state->regs[REG_x1] = 4;           // base address
+  state->regs[REG_x5] = 0xDEADBEEFu; // word value to store
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// SW: Store word to different location - sw x5, 0(x1)
+// Store word to memory[2]
+void load_test_sw_offset_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  // Instruction at memory[0]
+  const uint32_t sw_x5_0_x1 =
+      (0u << 25) | (5u << 20) | (1u << 15) | (0x2u << 12) | (0u << 7) | (0x23u);
+  state->memory[0] = sw_x5_0_x1;
+
+  // Data will be stored at memory[2]
+  state->memory[2] = 0x00000000u; // Initially cleared
+
+  state->regs[REG_x1] = 8;           // base address (points to memory[2])
+  state->regs[REG_x5] = 0xCAFEBABEu; // word value to store
   state->pc = 0;
   state->is_valid = true;
   state->is_running = true;
@@ -636,6 +748,14 @@ static test_case_t tests[] = {
     {"LBU   x3, 0(x1) [0xFF]", load_test_lbu_0xff_program, 0x000000FFu},
     {"LHU   x3, 0(x1) [0x8000]", load_test_lhu_program, 0x00008000u},
     {"LHU   x3, 0(x1) [0xFFFF]", load_test_lhu_offset_program, 0x0000FFFFu},
+
+    // Store instructions (S-format, opcode 0x23)
+    {"SB    x5, 0(x1) [0xAB]", load_test_sb_program, 0},
+    {"SB    x5, 0(x1) [0xFF]", load_test_sb_0xff_program, 0},
+    {"SH    x5, 0(x1) [0x1234]", load_test_sh_program, 0},
+    // {"SH    x5, 0(x1) [0x8000]", load_test_sh_negative_program, 0},
+    {"SW    x5, 0(x1) [0xDEADBEEF]", load_test_sw_program, 0},
+    {"SW    x5, 0(x1) [0xCAFEBABE]", load_test_sw_offset_program, 0},
 
     {"JALR  x3, 12(x0)", load_test_jalr_program, 42},
 

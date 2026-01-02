@@ -236,10 +236,15 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     uint32_t imm_final = (imm_2 << 5) | imm_1;
 
     switch (funct3) {
-
-    case 0x2: { // sw
+    case 0x0:
+      result->name = SB;
+      break;
+    case 0x1:
+      result->name = SH;
+      break;
+    case 0x2:
       result->name = SW;
-    } break;
+      break;
     default:
       assert(false && "S-FMT instruction not implemented");
     }
@@ -311,6 +316,17 @@ static uint32_t read_bytes(const risc_v_state *state, uint32_t addr,
   assert(is_address_valid(addr) &&
          "Invalid address for read_byte, might be unaligned?");
   return (state->memory[addr / 4] >> (8 * (addr % 4))) & mask;
+}
+
+static void write_bytes(risc_v_state *state, uint32_t addr, uint32_t value,
+                        uint32_t mask) {
+  assert(is_address_valid(addr) &&
+         "Invalid address for write_bytes, might be unaligned?");
+  uint32_t word_idx = addr / 4;
+  uint32_t shift = 8 * (addr % 4);
+  // Clear the bytes we're writing to, then OR in the new value
+  state->memory[word_idx] =
+      (state->memory[word_idx] & ~(mask << shift)) | ((value & mask) << shift);
 }
 
 void execute_instruction(risc_v_state *state, const Instruction *insn) {
@@ -388,23 +404,20 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     state->pc += 4;
   } break;
 
-  case SW: {
+  // == STORE exec
 
-    // Store word: compute effective address and write rs2 value into memory
-    uint32_t rs1 = insn->ops[0]; // base register
-    uint32_t rs2 = insn->ops[1]; // source register (value to store)
-    int32_t imm = SEXT12(insn->ops[2]);
-
-    uint32_t addr = state->regs[rs1] + imm; // byte address
-
-    // FIXME The quality of these errors might not be to good rn. will come back
-    // later.
-    TRY_OR_EXIT(is_address_valid(addr), "Invalid address for SW Instruction");
-    uint32_t index = addr / sizeof(uint32_t);
-
-    state->memory[index] = state->regs[rs2];
-    state->pc += 4;
+#define S_OP(name, store_mask)                                                 \
+  case name: {                                                                 \
+    uint32_t rs1 = insn->ops[0], rs2 = insn->ops[1],                           \
+             imm = SEXT12(insn->ops[2]);                                       \
+    uint32_t addr = state->regs[rs1] + imm;                                    \
+    write_bytes(state, addr, state->regs[rs2], store_mask);                    \
+    state->pc += 4;                                                            \
   } break;
+
+    S_OP(SB, 0xFF)
+    S_OP(SH, 0xFFFF)
+    S_OP(SW, 0xFFFFFFFF)
 
     // == LOAD exec
 
