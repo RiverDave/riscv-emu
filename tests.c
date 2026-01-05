@@ -341,6 +341,264 @@ void load_test_addi_program(risc_v_state *state) {
   state->is_running = true;
 }
 
+// BEQ: Branch if Equal - beq x1, x2, 8
+// True case: x1 == x2, branch taken, x3 = 100
+void load_test_beq_true_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t beq_x1_x2_12 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x0u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = beq_x1_x2_12;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 42;
+  state->regs[REG_x2] = 42;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BEQ: False case - x1 != x2, branch not taken, x3 = 0
+void load_test_beq_false_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t beq_x1_x2_12 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x0u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = beq_x1_x2_12;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 42;
+  state->regs[REG_x2] = 99;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BNE: Branch if Not Equal - bne x1, x2, 8
+// True case: x1 != x2, branch taken, x3 = 100
+void load_test_bne_true_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t bne_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x1u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = bne_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 42;
+  state->regs[REG_x2] = 99;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BNE: False case - x1 == x2, branch not taken, x3 = 0
+void load_test_bne_false_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t bne_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x1u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = bne_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 42;
+  state->regs[REG_x2] = 42;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BLT: Branch if Less Than (signed) - blt x1, x2, 8
+// True case: x1 < x2, branch taken, x3 = 100
+void load_test_blt_true_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t blt_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x4u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = blt_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 10;
+  state->regs[REG_x2] = 50;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BLT: False case - x1 >= x2, branch not taken, x3 = 0
+void load_test_blt_false_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t blt_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x4u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = blt_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 50;
+  state->regs[REG_x2] = 50;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BGE: Branch if Greater or Equal (signed) - bge x1, x2, 8
+// True case: x1 >= x2, branch taken, x3 = 100
+void load_test_bge_true_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t bge_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x5u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = bge_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 50;
+  state->regs[REG_x2] = 50;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BGE: False case - x1 < x2, branch not taken, x3 = 0
+void load_test_bge_false_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t bge_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x5u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = bge_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 10;
+  state->regs[REG_x2] = 50;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BLTU: Branch if Less Than Unsigned - bltu x1, x2, 8
+// True case: x1 < x2 (unsigned), branch taken, x3 = 100
+void load_test_bltu_true_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t bltu_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x6u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = bltu_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 10;
+  state->regs[REG_x2] = 50;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BLTU: False case - x1 >= x2 (unsigned), branch not taken, x3 = 0
+void load_test_bltu_false_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t bltu_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x6u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = bltu_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 50;
+  state->regs[REG_x2] = 50;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BGEU: Branch if Greater or Equal Unsigned - bgeu x1, x2, 8
+// True case: x1 >= x2 (unsigned), branch taken, x3 = 100
+void load_test_bgeu_true_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t bgeu_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x7u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = bgeu_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 50;
+  state->regs[REG_x2] = 50;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
+// BGEU: False case - x1 < x2 (unsigned), branch not taken, x3 = 0
+void load_test_bgeu_false_program(risc_v_state *state) {
+  if (!state)
+    return;
+  reset_state(state);
+  const uint32_t bgeu_x1_x2_8 =
+      (0u << 25) | (2u << 20) | (1u << 15) | (0x7u << 12) | (3u << 8) | (0x63u);
+  state->memory[0] = bgeu_x1_x2_8;
+  const uint32_t addi_x3_x0_0 =
+      (0u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[1] = addi_x3_x0_0;
+  const uint32_t addi_x3_x0_100 =
+      (100u << 20) | (0u << 15) | (0x0u << 12) | (3u << 7) | (0x13u);
+  state->memory[3] = addi_x3_x0_100;
+  state->regs[REG_x1] = 10;
+  state->regs[REG_x2] = 50;
+  state->pc = 0;
+  state->is_valid = true;
+  state->is_running = true;
+}
+
 // JALR: jalr x3, 12(x0) then addi x4, x0, 42 at target
 void load_test_jalr_program(risc_v_state *state) {
   if (!state)
@@ -753,11 +1011,24 @@ static test_case_t tests[] = {
     {"SB    x5, 0(x1) [0xAB]", load_test_sb_program, 0},
     {"SB    x5, 0(x1) [0xFF]", load_test_sb_0xff_program, 0},
     {"SH    x5, 0(x1) [0x1234]", load_test_sh_program, 0},
-    // {"SH    x5, 0(x1) [0x8000]", load_test_sh_negative_program, 0},
     {"SW    x5, 0(x1) [0xDEADBEEF]", load_test_sw_program, 0},
     {"SW    x5, 0(x1) [0xCAFEBABE]", load_test_sw_offset_program, 0},
 
     {"JALR  x3, 12(x0)", load_test_jalr_program, 42},
+
+    // Branch instructions (B-format, opcode 0x63)
+    {"BEQ  x1, x2, 8 (taken)", load_test_beq_true_program, 100},
+    {"BEQ  x1, x2, 8 (not taken)", load_test_beq_false_program, 0},
+    {"BNE  x1, x2, 8 (taken)", load_test_bne_true_program, 100},
+    {"BNE  x1, x2, 8 (not taken)", load_test_bne_false_program, 0},
+    {"BLT  x1, x2, 8 (taken)", load_test_blt_true_program, 100},
+    {"BLT  x1, x2, 8 (not taken)", load_test_blt_false_program, 0},
+    {"BGE  x1, x2, 8 (taken)", load_test_bge_true_program, 100},
+    {"BGE  x1, x2, 8 (not taken)", load_test_bge_false_program, 0},
+    {"BLTU x1, x2, 8 (taken)", load_test_bltu_true_program, 100},
+    {"BLTU x1, x2, 8 (not taken)", load_test_bltu_false_program, 0},
+    {"BGEU x1, x2, 8 (taken)", load_test_bgeu_true_program, 100},
+    {"BGEU x1, x2, 8 (not taken)", load_test_bgeu_false_program, 0},
 
 };
 

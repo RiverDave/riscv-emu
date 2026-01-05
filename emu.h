@@ -131,7 +131,13 @@ typedef struct {
   X(SRL)                                                                       \
   X(SRA)                                                                       \
   X(SLT)                                                                       \
-  X(SLTU)
+  X(SLTU)                                                                      \
+  X(BEQ)                                                                       \
+  X(BNE)                                                                       \
+  X(BLT)                                                                       \
+  X(BGE)                                                                       \
+  X(BLTU)                                                                      \
+  X(BGEU)
 
 typedef enum {
 #define X(name) name,
@@ -149,7 +155,8 @@ typedef enum {
   S_FMT = 0x23,
   I_JMP_FMT = 0x67, // jalr
   SB_FMT,           // TODO
-  UJ_FMT
+  UJ_FMT,
+  B_FMT = 0x63,
 } IFormat;
 
 typedef struct {

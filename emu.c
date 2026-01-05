@@ -255,6 +255,57 @@ bool decode_instruction(risc_v_state *state, const uint32_t instruction,
     result->ops[2] = imm_final;
 
   } break;
+
+  case B_FMT: {
+    uint32_t funct3 = ((instruction >> 12) & 0x7);
+    uint32_t rs1 = ((instruction >> 15) & 0x1F);
+    uint32_t rs2 = ((instruction >> 20) & 0x1F);
+
+    // B-format immediate is split across multiple fields:
+    //  - imm[12] at bits[31]
+    //  - imm[10:5] at bits[30:25]
+    //  - imm[4:1] at bits[11:8]
+    //  - imm[11] at bits[7]
+    //  - imm[0] = implicit 0
+    uint32_t imm_11_4_1 = ((instruction >> 8) & 0xF); // imm[4:1]
+    uint32_t imm_10_5 = ((instruction >> 25) & 0x3F); // imm[10:5]
+    uint32_t imm_11 = ((instruction >> 7) & 0x1);     // imm[11]
+    uint32_t imm_12 = ((instruction >> 31) & 0x1);    // imm[12]
+    // Reconstruct 12-bit immediate value, then shift left by 1 for the implicit
+    // LSB (2-byte units)
+    uint32_t imm_final =
+        ((imm_12 << 12) | (imm_11 << 11) | (imm_10_5 << 5) | (imm_11_4_1 << 1))
+        << 1;
+
+    switch (funct3) {
+    case 0x0:
+      result->name = BEQ;
+      break;
+    case 0x1:
+      result->name = BNE;
+      break;
+    case 0x4:
+      result->name = BLT;
+      break;
+    case 0x5:
+      result->name = BGE;
+      break;
+    case 0x6:
+      result->name = BLTU;
+      break;
+    case 0x7:
+      result->name = BGEU;
+      break;
+    default:
+      assert("NYI");
+      break;
+    }
+
+    result->ops[0] = rs1;
+    result->ops[1] = rs2;
+    result->ops[2] = imm_final;
+  } break;
+
   default: {
     if (!opcode) // Other opcodes TBD
       return false;
@@ -427,6 +478,33 @@ void execute_instruction(risc_v_state *state, const Instruction *insn) {
     // preserve msb if 0 so no sext macro magic needed
     LOAD_OP(LBU, /*mask=*/0xFF, NO_SEXT, /*sext=*/false)
     LOAD_OP(LHU, /*mask=*/0xFFFF, NO_SEXT, /*sext=*/false)
+
+#define B_OP(name, op, is_sext)                                                \
+  case name: {                                                                 \
+    uint32_t rs1 = insn->ops[0], rs2 = insn->ops[1];                           \
+    int32_t imm = SEXT12(insn->ops[2]);                                        \
+    uint32_t jmp_addr = state->pc + imm;                                       \
+    TRY_OR_EXIT(is_address_valid(jmp_addr),                                    \
+                "Invalid Jump Address for B instruction");                     \
+    bool cond = is_sext                                                        \
+                    ? (int32_t)state->regs[rs1] op(int32_t) state->regs[rs2]   \
+                    : state->regs[rs1] op state->regs[rs2];                    \
+    if (cond) {                                                                \
+      if (jmp_addr == 0) {                                                     \
+        state->is_running = false;                                             \
+        break;                                                                 \
+      }                                                                        \
+      state->pc = jmp_addr;                                                    \
+    } else                                                                     \
+      state->pc += 4;                                                          \
+  } break;
+
+    B_OP(BEQ, ==, /*is_sext=*/true)
+    B_OP(BNE, !=, /*is_sext=*/true)
+    B_OP(BLT, <, /*is_sext=*/true)
+    B_OP(BGE, >=, /*is_sext=*/true)
+    B_OP(BLTU, <, /*is_sext=*/false)
+    B_OP(BGEU, >=, /*is_sext=*/false)
 
   case JALR: {
     uint32_t rd = insn->ops[0];
